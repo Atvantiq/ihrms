@@ -40,6 +40,7 @@ export interface EmployeeDetail extends EmployeeListItem {
   alternate_phone: string | null;
   pan_no: string | null;
   aadhaar_no: string | null;
+  pii_visible: boolean;
 }
 
 export interface DirectoryStats {

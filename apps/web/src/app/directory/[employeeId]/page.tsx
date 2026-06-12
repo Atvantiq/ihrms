@@ -103,16 +103,22 @@ export default function ProfilePage({
         <Field label="Alternate phone" value={emp.alternate_phone} />
       </Section>
 
-      <Section title="Personal">
-        <Field label="Date of birth" value={emp.date_of_birth} />
-        <Field label="Gender" value={emp.gender} />
-        <Field label="Marital status" value={emp.marital_status} />
-        <Field label="Father's name" value={emp.fathers_name} />
-        <Field label="Mother's name" value={emp.mothers_name} />
-        <Field label="Spouse" value={emp.spouse_name} />
-        <Field label="PAN" value={emp.pan_no} />
-        <Field label="Aadhaar" value={emp.aadhaar_no} />
-      </Section>
+      {emp.pii_visible ? (
+        <Section title="Personal">
+          <Field label="Date of birth" value={emp.date_of_birth} />
+          <Field label="Gender" value={emp.gender} />
+          <Field label="Marital status" value={emp.marital_status} />
+          <Field label="Father's name" value={emp.fathers_name} />
+          <Field label="Mother's name" value={emp.mothers_name} />
+          <Field label="Spouse" value={emp.spouse_name} />
+          <Field label="PAN" value={emp.pan_no} />
+          <Field label="Aadhaar" value={emp.aadhaar_no} />
+        </Section>
+      ) : (
+        <div className="rounded-xl border border-line bg-line-2/50 p-4 text-xs text-mute">
+          🔒 Personal details are visible to HR and the employee only.
+        </div>
+      )}
     </main>
   );
 }

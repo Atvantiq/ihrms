@@ -11,10 +11,10 @@ from app.contexts.core_hr.schemas import (
     EmployeeListOut,
 )
 from app.contexts.core_hr.service import derive_status, fetch_directory, full_name, tenure_label
+from app.contexts.identity.principal import Principal, get_current_principal
 from app.core.db import get_session
-from app.core.security import require_user
 
-router = APIRouter(prefix="/employees", tags=["employees"], dependencies=[Depends(require_user)])
+router = APIRouter(prefix="/employees", tags=["employees"])
 
 
 def _to_list_item(row: dict[str, Any], today: date) -> EmployeeListItem:
@@ -36,6 +36,7 @@ def _to_list_item(row: dict[str, Any], today: date) -> EmployeeListItem:
 @router.get("", response_model=EmployeeListOut)
 async def list_employees(
     session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
     q: str = "",
     department: str = "",
     status: str = "",
@@ -80,7 +81,11 @@ async def list_employees(
 async def get_employee(
     employee_id: int,
     session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
 ) -> EmployeeDetail:
+    # PII (personal/statutory fields) is visible only to HR or the person
+    # themselves — directory users see job + contact info only.
+    pii_visible = principal.is_hr or principal.employee_id == employee_id
     today = date.today()
     rows = await fetch_directory(session)
     for row in rows:
@@ -93,17 +98,18 @@ async def get_employee(
                 last_name=row["last_name"],
                 short_name=row["short_name"],
                 phone=row["phone"],
-                date_of_birth=row["date_of_birth"],
                 gender=row["gender"],
                 division=row["division"],
                 reporting_manager_id=row["reporting_manager_id"],
                 date_of_leaving=row["date_of_leaving"],
-                fathers_name=row["fathers_name"],
-                mothers_name=row["mothers_name"],
-                marital_status=row["marital_status"],
-                spouse_name=row["spouse_name"],
-                alternate_phone=row["alternate_phone"],
-                pan_no=row["pan_no"],
-                aadhaar_no=row["aadhaar_no"],
+                date_of_birth=row["date_of_birth"] if pii_visible else None,
+                fathers_name=row["fathers_name"] if pii_visible else None,
+                mothers_name=row["mothers_name"] if pii_visible else None,
+                marital_status=row["marital_status"] if pii_visible else None,
+                spouse_name=row["spouse_name"] if pii_visible else None,
+                alternate_phone=row["alternate_phone"] if pii_visible else None,
+                pan_no=row["pan_no"] if pii_visible else None,
+                aadhaar_no=row["aadhaar_no"] if pii_visible else None,
+                pii_visible=pii_visible,
             )
     raise HTTPException(404, "Employee not found")

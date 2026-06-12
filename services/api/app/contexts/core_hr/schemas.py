@@ -37,6 +37,7 @@ class EmployeeDetail(EmployeeListItem):
     alternate_phone: str | None = None
     pan_no: str | None = None
     aadhaar_no: str | None = None
+    pii_visible: bool = False
 
 
 class DirectoryStats(BaseModel):
