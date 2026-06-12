@@ -1,0 +1,13 @@
+{
+  "name": "@ihrms/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript client generated from the FastAPI OpenAPI spec — the contract bridge between web and api. Regenerate after backend changes; CI fails on uncommitted drift.",
+  "types": "src/schema.d.ts",
+  "scripts": {
+    "generate": "openapi-typescript http://localhost:8000/openapi.json -o src/schema.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.0"
+  }
+}

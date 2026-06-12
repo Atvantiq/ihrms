@@ -1,0 +1,13 @@
+{
+  "name": "ihrms",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace apps/web",
+    "dev:api": "cd services/api && .venv/bin/uvicorn app.main:app --reload --port 8000",
+    "generate:client": "npm run generate --workspace packages/api-client"
+  }
+}
