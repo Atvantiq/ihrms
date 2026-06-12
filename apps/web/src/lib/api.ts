@@ -79,6 +79,76 @@ async function apiGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface MeOut {
+  employee_id: number;
+  email: string;
+  roles: string[];
+  persona: string;
+  is_hr: boolean;
+}
+
+export interface DirectoryMeta {
+  departments: string[];
+  divisions: string[];
+  branches: string[];
+  designations: string[];
+  circle_ids: number[];
+}
+
+export interface EmployeeCreate {
+  first_name: string;
+  middle_name: string | null;
+  last_name: string | null;
+  email: string;
+  phone: string;
+  employee_code: string;
+  gender: string | null;
+  date_of_birth: string | null;
+  designation: string;
+  department: string;
+  division: string;
+  branch: string;
+  circle_id: number;
+  reporting_manager_id: number | null;
+  date_of_joining: string;
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login";
+    throw new Error("Not signed in");
+  }
+  if (!res.ok) {
+    let detail = await res.text();
+    try {
+      detail = JSON.parse(detail).detail ?? detail;
+    } catch {}
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  return res.json() as Promise<T>;
+}
+
+export function fetchMe(): Promise<MeOut> {
+  return apiGet<MeOut>("/me");
+}
+
+export function fetchDirectoryMeta(): Promise<DirectoryMeta> {
+  return apiGet<DirectoryMeta>("/employees/meta");
+}
+
+export function createEmployee(payload: EmployeeCreate): Promise<EmployeeDetail> {
+  return apiPost<EmployeeDetail>("/employees", payload);
+}
+
 export function fetchEmployees(params: {
   q?: string;
   department?: string;

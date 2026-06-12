@@ -4,6 +4,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contexts.core_hr.create import (
+    DirectoryMeta,
+    EmployeeCreate,
+    create_employee,
+    fetch_meta,
+)
 from app.contexts.core_hr.schemas import (
     DirectoryStats,
     EmployeeDetail,
@@ -11,7 +17,12 @@ from app.contexts.core_hr.schemas import (
     EmployeeListOut,
 )
 from app.contexts.core_hr.service import derive_status, fetch_directory, full_name, tenure_label
-from app.contexts.identity.principal import Principal, get_current_principal
+from app.contexts.identity.principal import (
+    ROLE_HR_ADMIN,
+    Principal,
+    get_current_principal,
+    require_roles,
+)
 from app.core.db import get_session
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -75,6 +86,27 @@ async def list_employees(
         total_matches=len(matches),
         stats=stats,
     )
+
+
+@router.get("/meta", response_model=DirectoryMeta)
+async def directory_meta(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> DirectoryMeta:
+    return await fetch_meta(session)
+
+
+@router.post("", response_model=EmployeeDetail, status_code=201)
+async def add_employee(
+    payload: EmployeeCreate,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> EmployeeDetail:
+    try:
+        employee_id = await create_employee(session, payload)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return await get_employee(employee_id, session, principal)
 
 
 @router.get("/{employee_id}", response_model=EmployeeDetail)

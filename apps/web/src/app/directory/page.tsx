@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchEmployees,
+  fetchMe,
   type EmployeeListOut,
 } from "@/lib/api";
 import { Avatar } from "@/components/Avatar";
@@ -39,6 +40,13 @@ export default function DirectoryPage() {
   const [q, setQ] = useState("");
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
+  const [isHr, setIsHr] = useState(false);
+
+  useEffect(() => {
+    fetchMe()
+      .then((me) => setIsHr(me.is_hr))
+      .catch(() => {});
+  }, []);
 
   // debounce the search input
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -71,13 +79,14 @@ export default function DirectoryPage() {
               : "Loading directory…"}
           </p>
         </div>
-        <button
-          className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface opacity-50"
-          title="Coming in a later milestone"
-          disabled
-        >
-          + Add employee
-        </button>
+        {isHr && (
+          <Link
+            href="/directory/new"
+            className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
+          >
+            + Add employee
+          </Link>
+        )}
       </div>
 
       {/* Filter bar */}
