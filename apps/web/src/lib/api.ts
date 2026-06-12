@@ -201,6 +201,48 @@ export async function updateEmployee(
   return res.json() as Promise<EmployeeDetail>;
 }
 
+export type OrgKind = "department" | "division" | "branch" | "designation";
+
+export interface OrgMaster {
+  id: string;
+  kind: OrgKind;
+  name: string;
+  raw_values: string[];
+  employee_count: number;
+}
+
+export function fetchOrgMasters(kind?: OrgKind): Promise<OrgMaster[]> {
+  return apiGet<OrgMaster[]>(`/org/masters${kind ? `?kind=${kind}` : ""}`);
+}
+
+export function createOrgMaster(kind: OrgKind, name: string): Promise<OrgMaster> {
+  return apiPost<OrgMaster>("/org/masters", { kind, name });
+}
+
+export async function renameOrgMaster(id: string, name: string): Promise<OrgMaster> {
+  const res = await fetch(`${API_BASE}/org/masters/${id}`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    let detail = await res.text();
+    try {
+      detail = JSON.parse(detail).detail ?? detail;
+    } catch {}
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  return res.json() as Promise<OrgMaster>;
+}
+
+export function mergeOrgMaster(id: string, intoId: string): Promise<OrgMaster> {
+  return apiPost<OrgMaster>(`/org/masters/${id}/merge`, { into_master_id: intoId });
+}
+
 export function fetchEmployees(params: {
   q?: string;
   department?: string;

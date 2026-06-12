@@ -52,14 +52,14 @@ async def fetch_meta(session: AsyncSession) -> DirectoryMeta:
     rows = (
         await session.execute(
             text("""select
-              array(select distinct department from public.job_details
-                    where department is not null order by 1) as departments,
-              array(select distinct division from public.job_details
-                    where division is not null order by 1) as divisions,
-              array(select distinct branch from public.job_details
-                    where branch is not null order by 1) as branches,
-              array(select distinct designation from public.job_details
-                    where designation is not null order by 1) as designations,
+              array(select name from ihrms.org_masters
+                    where kind = 'department' and is_active order by lower(name)) as departments,
+              array(select name from ihrms.org_masters
+                    where kind = 'division' and is_active order by lower(name)) as divisions,
+              array(select name from ihrms.org_masters
+                    where kind = 'branch' and is_active order by lower(name)) as branches,
+              array(select name from ihrms.org_masters
+                    where kind = 'designation' and is_active order by lower(name)) as designations,
               array(select distinct circle_id from public.job_details
                     order by 1) as circle_ids
             """)
