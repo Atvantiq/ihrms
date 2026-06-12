@@ -37,6 +37,7 @@
 | 21 | **Integration strategy** | `21-integration-strategy.md` |
 | 22 | **Reporting & analytics strategy** | `22-reporting-strategy.md` |
 | 23 | **Future expansion strategy** | `23-future-expansion.md` |
+| 24 | **ONAQT shared-database integration** | `24-onaqt-database-integration.md` |
 
 ## How to read this blueprint
 
