@@ -31,6 +31,7 @@ export interface EmployeeDetail extends EmployeeListItem {
   date_of_birth: string | null;
   gender: string | null;
   division: string | null;
+  circle_id: number | null;
   reporting_manager_id: number | null;
   date_of_leaving: string | null;
   fathers_name: string | null;
@@ -147,6 +148,57 @@ export function fetchDirectoryMeta(): Promise<DirectoryMeta> {
 
 export function createEmployee(payload: EmployeeCreate): Promise<EmployeeDetail> {
   return apiPost<EmployeeDetail>("/employees", payload);
+}
+
+export type EmployeeUpdate = Partial<{
+  first_name: string;
+  middle_name: string | null;
+  last_name: string | null;
+  phone: string;
+  gender: string | null;
+  date_of_birth: string | null;
+  designation: string;
+  department: string;
+  division: string;
+  branch: string;
+  circle_id: number;
+  reporting_manager_id: number | null;
+  date_of_joining: string;
+  date_of_leaving: string | null;
+  fathers_name: string | null;
+  mothers_name: string | null;
+  marital_status: string | null;
+  spouse_name: string | null;
+  alternate_phone: string | null;
+  pan_no: string | null;
+  aadhaar_no: string | null;
+}>;
+
+export async function updateEmployee(
+  employeeId: number,
+  payload: EmployeeUpdate,
+): Promise<EmployeeDetail> {
+  const res = await fetch(`${API_BASE}/employees/${employeeId}`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login";
+    throw new Error("Not signed in");
+  }
+  if (!res.ok) {
+    let detail = await res.text();
+    try {
+      detail = JSON.parse(detail).detail ?? detail;
+    } catch {}
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  return res.json() as Promise<EmployeeDetail>;
 }
 
 export function fetchEmployees(params: {

@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchEmployee, type EmployeeDetail } from "@/lib/api";
+import { fetchEmployee, fetchMe, type EmployeeDetail } from "@/lib/api";
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 
@@ -34,11 +34,15 @@ export default function ProfilePage({
   const { employeeId } = use(params);
   const [emp, setEmp] = useState<EmployeeDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isHr, setIsHr] = useState(false);
 
   useEffect(() => {
     fetchEmployee(employeeId)
       .then(setEmp)
       .catch((e: Error) => setError(e.message));
+    fetchMe()
+      .then((me) => setIsHr(me.is_hr))
+      .catch(() => {});
   }, [employeeId]);
 
   if (error)
@@ -58,9 +62,19 @@ export default function ProfilePage({
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 space-y-4 p-6">
-      <Link href="/directory" className="text-xs text-mute hover:text-ink">
-        ← Back to People
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/directory" className="text-xs text-mute hover:text-ink">
+          ← Back to People
+        </Link>
+        {isHr && (
+          <Link
+            href={`/directory/${employeeId}/edit`}
+            className="rounded-lg border border-line px-3 py-1 text-xs font-medium text-ink hover:bg-line-2"
+          >
+            ✎ Edit
+          </Link>
+        )}
+      </div>
 
       {/* Header card */}
       <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-6 shadow-md">

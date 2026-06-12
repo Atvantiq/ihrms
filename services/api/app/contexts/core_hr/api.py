@@ -17,6 +17,7 @@ from app.contexts.core_hr.schemas import (
     EmployeeListOut,
 )
 from app.contexts.core_hr.service import derive_status, fetch_directory, full_name, tenure_label
+from app.contexts.core_hr.update import EmployeeUpdate, update_employee
 from app.contexts.identity.principal import (
     ROLE_HR_ADMIN,
     Principal,
@@ -109,6 +110,22 @@ async def add_employee(
     return await get_employee(employee_id, session, principal)
 
 
+@router.patch("/{employee_id}", response_model=EmployeeDetail)
+async def edit_employee(
+    employee_id: int,
+    payload: EmployeeUpdate,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> EmployeeDetail:
+    try:
+        await update_employee(session, employee_id, payload)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return await get_employee(employee_id, session, principal)
+
+
 @router.get("/{employee_id}", response_model=EmployeeDetail)
 async def get_employee(
     employee_id: int,
@@ -132,6 +149,7 @@ async def get_employee(
                 phone=row["phone"],
                 gender=row["gender"],
                 division=row["division"],
+                circle_id=row["circle_id"],
                 reporting_manager_id=row["reporting_manager_id"],
                 date_of_leaving=row["date_of_leaving"],
                 date_of_birth=row["date_of_birth"] if pii_visible else None,

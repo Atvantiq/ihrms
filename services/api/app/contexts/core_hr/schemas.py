@@ -28,6 +28,7 @@ class EmployeeDetail(EmployeeListItem):
     date_of_birth: date | None = None
     gender: str | None = None
     division: str | None = None
+    circle_id: int | None = None
     reporting_manager_id: int | None = None
     date_of_leaving: date | None = None
     fathers_name: str | None = None

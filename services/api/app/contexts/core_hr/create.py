@@ -89,8 +89,10 @@ async def create_employee(session: AsyncSession, payload: EmployeeCreate) -> int
     dup = (
         await session.execute(
             text("""select
-              exists(select 1 from public.employees where lower(email)=lower(:email)) as email_taken,
-              exists(select 1 from public.employees where lower(employee_code)=lower(:code)) as code_taken
+              exists(select 1 from public.employees
+                     where lower(email) = lower(:email)) as email_taken,
+              exists(select 1 from public.employees
+                     where lower(employee_code) = lower(:code)) as code_taken
             """),
             {"email": payload.email, "code": payload.employee_code},
         )

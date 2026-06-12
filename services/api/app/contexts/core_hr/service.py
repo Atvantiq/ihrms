@@ -20,7 +20,7 @@ _BASE_QUERY = text("""
     select v.employee_id, v.employee_code, v.email,
            v.first_name, v.middle_name, v.last_name, v.short_name,
            v.phone, v.date_of_birth, v.gender, v.is_active,
-           v.designation, v.department, v.division, v.branch,
+           v.designation, v.department, v.division, v.branch, v.circle_id,
            v.reporting_manager_id, v.date_of_joining, v.date_of_leaving,
            v.fathers_name, v.mothers_name, v.marital_status, v.spouse_name,
            v.alternate_phone, v.pan_no, v.aadhaar_no,
