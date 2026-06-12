@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_jwt_secret: str = ""
 
+    # DEV ONLY — lets endpoints run before Supabase keys are wired
+    auth_disabled: bool = False
+
+    # Comma-separated origins for the web app
+    cors_origins: str = "http://localhost:3000"
+
     @property
     def sqlalchemy_async_url(self) -> str:
         if self.database_url_async:

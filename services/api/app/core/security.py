@@ -36,3 +36,20 @@ def current_auth_user(
     if credentials is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
     return decode_supabase_jwt(credentials.credentials)
+
+
+def require_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> dict[str, Any]:
+    """Auth gate for protected endpoints.
+
+    DEV ONLY: when settings.auth_disabled is true (local .env), requests pass
+    without a token so screens can be built before Supabase keys are wired.
+    Never enable outside the dev environment.
+    """
+    settings = get_settings()
+    if settings.auth_disabled and settings.environment == "dev":
+        return {"sub": "dev-bypass", "role": "authenticated"}
+    if credentials is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
+    return decode_supabase_jwt(credentials.credentials)
