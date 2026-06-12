@@ -58,11 +58,22 @@ export interface EmployeeListOut {
   stats: DirectoryStats;
 }
 
+async function authHeader(): Promise<Record<string, string>> {
+  const { supabase } = await import("@/lib/supabase");
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(await authHeader()) },
     cache: "no-store",
   });
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login";
+    throw new Error("Not signed in");
+  }
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
 }
