@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   decideConsent,
   fetchAttendance,
+  fetchClaimCategories,
+  fetchClaims,
   fetchConsent,
   fetchEmployee,
   fetchEmployeePayslips,
@@ -12,15 +14,24 @@ import {
   fetchLeaveRequests,
   fetchMe,
   fetchMyCheckIns,
+  fileClaim,
   logCheckIn,
   type AttendanceSummary,
   type CheckIn,
+  type Claim,
   type ConsentLine,
   type EmployeeDetail,
   type LeaveBalance,
   type LeaveRequest,
   type Payslip,
 } from "@/lib/api";
+
+const CLAIM_STATUS_STYLE: Record<Claim["status"], string> = {
+  pending: "bg-warn-soft text-warn-strong",
+  approved: "bg-blue-soft text-blue-strong",
+  rejected: "bg-red-soft text-red-strong",
+  paid: "bg-green-soft text-green-strong",
+};
 
 const CONSENT_STATUS_STYLE: Record<ConsentLine["status"], string> = {
   granted: "bg-green-soft text-green-strong",
@@ -78,6 +89,8 @@ export default function SelfServicePage() {
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
   const [consent, setConsent] = useState<ConsentLine[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [claimCats, setClaimCats] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -96,7 +109,27 @@ export default function SelfServicePage() {
       .catch((e: Error) => setError(e.message));
     fetchConsent().then(setConsent).catch(() => {});
     fetchMyCheckIns().then(setCheckIns).catch(() => {});
+    fetchClaims("mine").then(setClaims).catch(() => {});
+    fetchClaimCategories().then(setClaimCats).catch(() => {});
   }, []);
+
+  async function submitClaim(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await fileClaim({
+        category: fd.get("category") as string,
+        description: fd.get("description") as string,
+        claim_date: fd.get("claim_date") as string,
+        amount: fd.get("amount") as string,
+      });
+      form.reset();
+      fetchClaims("mine").then(setClaims).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   async function toggleConsent(purpose: string, grant: boolean) {
     try {
@@ -295,6 +328,36 @@ export default function SelfServicePage() {
                 <span className="ml-2 text-[11px] capitalize text-mute">{c.mood_label} · {c.check_in_date}</span>
               </div>
               {c.challenges && <div className="text-[11px] text-mute">⚠ {c.challenges}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">Expense claims</h2>
+          <p className="text-[11px] text-mute">File a reimbursement — approved claims are added to your next payout.</p>
+        </div>
+        <form onSubmit={submitClaim} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+          <select name="category" className="rounded-lg border border-line px-2 py-2 text-sm capitalize">
+            {claimCats.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input name="claim_date" type="date" required className="rounded-lg border border-line px-2 py-2 text-sm text-mute" />
+          <input name="amount" type="number" min="1" step="1" required placeholder="Amount ₹" className="w-28 rounded-lg border border-line px-3 py-2 text-sm" />
+          <input name="description" required maxLength={300} placeholder="Description" className="min-w-44 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">File claim</button>
+        </form>
+        <div className="divide-y divide-line-2">
+          {claims.length === 0 && <p className="px-4 py-3 text-sm text-mute">No claims filed.</p>}
+          {claims.map((c) => (
+            <div key={c.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span className="text-ink">
+                <span className="font-mono text-[11px]">₹{Number(c.amount).toLocaleString("en-IN")}</span>
+                <span className="ml-2 text-[11px] capitalize text-mute">{c.category} · {c.claim_date} · {c.description}</span>
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${CLAIM_STATUS_STYLE[c.status]}`}>
+                {c.status}
+              </span>
             </div>
           ))}
         </div>

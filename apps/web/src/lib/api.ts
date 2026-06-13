@@ -851,6 +851,38 @@ export function fetchWall(): Promise<Feedback[]> {
   return apiGet<Feedback[]>("/feedback/wall");
 }
 
+// ----------------------------------------------------------------- claims
+
+export interface Claim {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  category: string;
+  description: string;
+  claim_date: string;
+  amount: string;
+  receipt_ref: string | null;
+  status: "pending" | "approved" | "rejected" | "paid";
+}
+export function fetchClaimCategories(): Promise<string[]> {
+  return apiGet<string[]>("/claims/categories");
+}
+export function fetchClaims(scope: "mine" | "pending" = "mine"): Promise<Claim[]> {
+  return apiGet<Claim[]>(`/claims?scope=${scope}`);
+}
+export function fileClaim(body: {
+  category: string;
+  description: string;
+  claim_date: string;
+  amount: string;
+  receipt_ref?: string | null;
+}): Promise<Claim> {
+  return apiPost<Claim>("/claims", body);
+}
+export function decideClaim(id: string, action: "approve" | "reject"): Promise<Claim> {
+  return apiPost<Claim>(`/claims/${id}/${action}`, {});
+}
+
 // ----------------------------------------------------------------- policies
 
 export interface Policy {
@@ -1373,7 +1405,8 @@ export interface Task {
     | "regularization"
     | "overtime"
     | "comp_off"
-    | "duty";
+    | "duty"
+    | "claim";
   ref_id: string;
   employee_id: number;
   employee_name: string;

@@ -191,6 +191,38 @@ async def inbox(
             )
         )
 
+    # 2f) Expense claims waiting on me.
+    if is_hr:
+        claim_pending = await _scalar(
+            session,
+            """select count(*) from ihrms.expense_claim
+               where status='pending' and employee_id != :me""",
+            me=me,
+        )
+    else:
+        claim_pending = await _scalar(
+            session,
+            """select count(*) from ihrms.expense_claim c
+               where c.status='pending' and c.employee_id != :me
+                 and c.employee_id in (
+                   select employee_id from public.job_details
+                   where reporting_manager = :me and is_active = 1)""",
+            me=me,
+        )
+    if claim_pending:
+        decisions.append(
+            Decision(
+                kind="claim_approvals",
+                severity=severity_for_count(claim_pending, high_at=6),
+                icon="₹",
+                title=f"{claim_pending} expense claim{'s' if claim_pending != 1 else ''} to review",
+                detail="Reimbursement claims awaiting your approval.",
+                action_label="Review",
+                action_href="/tasks",
+                count=claim_pending,
+            )
+        )
+
     # 2e) Policies I still need to acknowledge (everyone).
     unacked = await _scalar(
         session,

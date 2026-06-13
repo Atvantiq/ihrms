@@ -27,7 +27,8 @@ class Task(BaseModel):
     """One actionable approval, normalised across modules."""
 
     task_type: Literal[
-        "leave", "timesheet", "increment", "regularization", "overtime", "comp_off", "duty"
+        "leave", "timesheet", "increment", "regularization", "overtime", "comp_off",
+        "duty", "claim",
     ]
     ref_id: str
     employee_id: int
@@ -238,6 +239,37 @@ async def list_tasks(
                 title=f"{'WFH' if r['duty_type'] == 'wfh' else 'On-duty'} request",
                 subtitle=f"From {r['start_date']}",
                 badge="duty",
+            )
+        )
+
+    # --- expense claims (HR: org; manager: reports) -----------------------
+    claim_where = "c.status = 'pending' and c.employee_id != :me"
+    if not is_hr:
+        claim_where += (
+            " and c.employee_id in (select employee_id from public.job_details"
+            " where reporting_manager = :me and is_active = 1)"
+        )
+    claim_rows = (
+        await session.execute(
+            text(f"""select c.id::text, c.employee_id, c.category, c.amount,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.expense_claim c
+                    left join public.employees e on e.employee_id = c.employee_id
+                    where {claim_where}
+                    order by c.claim_date"""),
+            {"me": me},
+        )
+    ).mappings().all()
+    for r in claim_rows:
+        tasks.append(
+            Task(
+                task_type="claim",
+                ref_id=r["id"],
+                employee_id=r["employee_id"],
+                employee_name=r["nm"] or "—",
+                title=f"Claim · {r['category']}",
+                subtitle=f"₹{int(r['amount']):,}",
+                badge="₹",
             )
         )
 

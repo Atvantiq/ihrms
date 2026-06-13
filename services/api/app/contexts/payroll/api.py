@@ -355,14 +355,31 @@ async def create_run(
             (ot_pay(o["hours"], o["rate_multiplier"], rate_per_hour) for o in ot_rows), D(0)
         )
 
+        # reimburse approved-but-unpaid expense claims
+        claims_due = (
+            await session.execute(
+                text("""select coalesce(sum(amount), 0) from ihrms.expense_claim
+                        where employee_id = :emp and status = 'approved'"""),
+                {"emp": st["employee_id"]},
+            )
+        ).scalar()
+        reimbursements = D(str(claims_due or 0))
+
         slip = compute_payslip(
             s, working_days=payload.working_days,
             lop_days=D(att.absent), declared_tds=tds, loan_recovery=loan_recovery,
-            arrears=arrears, overtime=overtime_pay, rates=rates,
+            arrears=arrears, overtime=overtime_pay, reimbursements=reimbursements,
+            rates=rates,
         )
         if ot_rows:
             await session.execute(
                 text("""update ihrms.overtime set status='paid', run_id=cast(:run as uuid)
+                        where employee_id=:emp and status='approved'"""),
+                {"emp": st["employee_id"], "run": run_id},
+            )
+        if reimbursements != 0:
+            await session.execute(
+                text("""update ihrms.expense_claim set status='paid', run_id=cast(:run as uuid)
                         where employee_id=:emp and status='approved'"""),
                 {"emp": st["employee_id"], "run": run_id},
             )
