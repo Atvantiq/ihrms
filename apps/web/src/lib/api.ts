@@ -264,6 +264,128 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- performance
+
+export interface ReviewCycle {
+  id: string;
+  name: string;
+  period_year: number;
+  status: string;
+  review_count: number;
+}
+
+export interface Review {
+  id: string;
+  cycle_id: string;
+  employee_id: number;
+  employee_name: string;
+  self_rating: number | null;
+  manager_rating: number | null;
+  potential: number | null;
+  final_rating: number | null;
+  status: string;
+  nine_box: number | null;
+  nine_box_label: string | null;
+  can_self: boolean;
+  can_manage: boolean;
+}
+
+export interface Increment {
+  id: string;
+  employee_id: number;
+  current_ctc: string;
+  proposed_ctc: string;
+  pct: string;
+  effective_date: string;
+  status: string;
+}
+
+export interface Goal {
+  id: string;
+  employee_id: number;
+  title: string;
+  description: string | null;
+  progress: number;
+  status: string;
+}
+
+export function fetchCycles(): Promise<ReviewCycle[]> {
+  return apiGet<ReviewCycle[]>("/performance/cycles");
+}
+export function createCycle(name: string, periodYear: number): Promise<ReviewCycle> {
+  return apiPost<ReviewCycle>("/performance/cycles", { name, period_year: periodYear });
+}
+export function enrollCycle(id: string): Promise<ReviewCycle> {
+  return apiPost<ReviewCycle>(`/performance/cycles/${id}/enroll`, {});
+}
+export function fetchCycleReviews(id: string): Promise<Review[]> {
+  return apiGet<Review[]>(`/performance/cycles/${id}/reviews`);
+}
+export function fetchMyReviews(): Promise<Review[]> {
+  return apiGet<Review[]>("/performance/reviews/mine");
+}
+export function submitSelfReview(id: string, rating: number, comment?: string): Promise<Review> {
+  return apiPost<Review>(`/performance/reviews/${id}/self`, {
+    self_rating: rating,
+    self_comment: comment ?? null,
+  });
+}
+export function submitManagerReview(
+  id: string,
+  rating: number,
+  potential: number,
+  comment?: string,
+): Promise<Review> {
+  return apiPost<Review>(`/performance/reviews/${id}/manager`, {
+    manager_rating: rating,
+    potential,
+    manager_comment: comment ?? null,
+  });
+}
+export function publishReview(id: string, finalRating?: number): Promise<Review> {
+  return apiPost<Review>(`/performance/reviews/${id}/publish`, {
+    final_rating: finalRating ?? null,
+  });
+}
+export function proposeIncrement(reviewId: string): Promise<Increment> {
+  return apiPost<Increment>(`/performance/reviews/${reviewId}/increment`, {});
+}
+export function approveIncrement(id: string): Promise<Increment> {
+  return apiPost<Increment>(`/performance/increments/${id}/approve`, {});
+}
+export function pushIncrement(id: string): Promise<Increment> {
+  return apiPost<Increment>(`/performance/increments/${id}/push`, {});
+}
+export function fetchGoals(): Promise<Goal[]> {
+  return apiGet<Goal[]>("/performance/goals");
+}
+export function addGoal(title: string, description?: string): Promise<Goal> {
+  return apiPost<Goal>("/performance/goals", { title, description: description ?? null });
+}
+export function updateGoal(id: string, progress: number, status?: string): Promise<Goal> {
+  return apiPatch<Goal>(`/performance/goals/${id}`, { progress, status: status ?? null });
+}
+
+async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let d = await res.text();
+    try {
+      d = JSON.parse(d).detail ?? d;
+    } catch {}
+    throw new Error(typeof d === "string" ? d : JSON.stringify(d));
+  }
+  return res.json() as Promise<T>;
+}
+
 // ----------------------------------------------------------------- recruitment
 
 export interface Requisition {
