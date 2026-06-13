@@ -56,3 +56,37 @@ npm run generate --workspace packages/api-client   # API must be running
 - `mypy --strict`; Pydantic models at every boundary
 - All iHRMS migrations create objects in the `ihrms` schema only
 - Next.js renders, FastAPI decides — no business logic in the web app
+
+## Tests
+
+```bash
+cd services/api
+.venv/bin/pytest -q                 # unit suite (pure, no DB) — runs anywhere
+.venv/bin/ruff check app/ tests/    # lint (migrations excluded — raw SQL DDL)
+.venv/bin/mypy app/                 # strict type-check
+
+# Integration suite (real app + real Postgres + real migrations).
+# Skipped automatically when TEST_DATABASE_URL is unset; CI provides a service container.
+TEST_DATABASE_URL=postgresql://postgres@localhost:5432/ihrms_test \
+  .venv/bin/pytest tests/integration -q
+```
+
+## Build status (vs blueprint doc 15 roadmap)
+
+The coded surface tracks the milestones in [`blueprint/15-implementation-roadmap.md`](blueprint/15-implementation-roadmap.md):
+
+| Track | Milestone | Status |
+|-------|-----------|--------|
+| A | M0 Foundation · M1 Core HR · M2 Time/Leave/Attendance | ✅ built |
+| A | M3 Payroll (statutory, TDS, GL, payslip PDF) | ✅ built |
+| A | M4 Talent Acquisition (requisition→offer→onboard) | ✅ built |
+| A | M5 Performance (reviews, 9-box, increment→payroll) | ✅ built |
+| A | M6 Exit & Full-and-Final settlement | ✅ built |
+| A | M7 Reports & hardening (CSV exports, audit, RLS, rate limits) | ✅ built |
+| B | TB0 Tenants · TB1 Billing (PEPM) · TB2 Statutory master | ✅ built |
+| B | TB2→M3 gate — payroll reads the active statutory pack | ✅ wired & verified |
+| B | TB3 Announcements (platform→tenant broadcast) | ✅ built |
+| B | TB4 SSO/MFA admin · TB5 Integrations hub · TB6 DR/residency | ⏳ needs infra/3rd-party |
+
+Operational items (load/pen testing, notification engine, AI assistant, CI/CD secrets)
+need real infrastructure and are out of scope for the dev environment.

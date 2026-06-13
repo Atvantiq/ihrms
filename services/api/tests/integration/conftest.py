@@ -103,7 +103,7 @@ def _db() -> None:
     )
     cur.execute(
         """insert into ihrms.user_account (auth_user_id, employee_id, roles, persona)
-           values (%s,%s,'{employee,hr_admin}','hr'),
+           values (%s,%s,'{employee,hr_admin,super_admin}','hr'),
                   (%s,%s,'{employee}','employee')""",
         (ADMIN_AUTH_ID, ADMIN_EMP_ID, EMP_AUTH_ID, EMP_EMP_ID),
     )

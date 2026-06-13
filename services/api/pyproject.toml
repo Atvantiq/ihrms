@@ -39,6 +39,9 @@ exclude = ["migrations/"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Migrations are append-only raw-SQL DDL; excluded from the lint gate (CI lints
+# app/ + tests/ only). Mirrors the mypy exclude above.
+exclude = ["migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
