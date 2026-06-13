@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="flex flex-1 items-center justify-center p-8">
@@ -14,9 +16,12 @@ export default function Home() {
           </span>
         </div>
         <div className="mt-6">
-          <a href="/directory" className="inline-block rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink-2">
+          <Link
+            href="/directory"
+            className="inline-block rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink-2"
+          >
             Open People directory →
-          </a>
+          </Link>
         </div>
       </div>
     </main>

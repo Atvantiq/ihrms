@@ -8,7 +8,7 @@ used +days; reject/cancel -> pending −days.
 
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -195,7 +195,7 @@ async def apply_leave(
              "end": payload.end_date, "half": payload.half_day, "days": days,
              "reason": payload.reason, "by": principal.employee_id},
         )
-    ).scalar()
+    ).scalar_one()
     await session.commit()
     return await _get_request(session, req_id, principal)
 
@@ -215,7 +215,7 @@ _REQ_SELECT = """
 
 
 async def _decorate(
-    session: AsyncSession, row: dict, principal: Principal
+    session: AsyncSession, row: dict[str, Any], principal: Principal
 ) -> LeaveRequestOut:
     mgr = await _manager_of(session, row["employee_id"])
     can_decide = (
@@ -285,7 +285,7 @@ async def list_requests(
 
 # ---------------------------------------------------------------- decisions
 
-async def _load_for_decision(session: AsyncSession, req_id: str) -> dict:
+async def _load_for_decision(session: AsyncSession, req_id: str) -> dict[str, Any]:
     row = (
         await session.execute(
             text("""select id::text, employee_id, leave_type_id::text, days, status
@@ -298,7 +298,7 @@ async def _load_for_decision(session: AsyncSession, req_id: str) -> dict:
     return dict(row)
 
 
-def _release_pending(req: dict) -> str:
+def _release_pending(req: dict[str, Any]) -> str:
     return """update ihrms.leave_balance set pending = greatest(pending - :d, 0),
               updated_at = now()
               where employee_id = :emp and leave_type_id = :lt and period_year = :yr"""

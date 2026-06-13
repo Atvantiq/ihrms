@@ -57,11 +57,6 @@ export default function DirectoryPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  // any filter change resets to the first page
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedQ, department, status]);
-
   useEffect(() => {
     fetchEmployees({
       q: debouncedQ,
@@ -124,7 +119,10 @@ export default function DirectoryPage() {
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(0);
+          }}
           placeholder="Search by name, ID, email…"
           className="min-w-60 flex-1 max-w-85 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none placeholder:text-mute-2 focus:border-indigo"
         />
@@ -133,7 +131,10 @@ export default function DirectoryPage() {
         </span>
         <select
           value={department}
-          onChange={(e) => setDepartment(e.target.value)}
+          onChange={(e) => {
+            setDepartment(e.target.value);
+            setPage(0);
+          }}
           className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         >
           <option value="">All departments</option>
@@ -145,7 +146,10 @@ export default function DirectoryPage() {
         </select>
         <select
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(0);
+          }}
           className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         >
           <option value="">All status</option>

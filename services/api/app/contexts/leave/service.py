@@ -6,6 +6,7 @@ float. Working days exclude Sat/Sun (holiday calendar comes in a later pass).
 
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +51,7 @@ def accrued_to_date(
 
 async def ensure_balance(
     session: AsyncSession, employee_id: int, leave_type_id: str, year: int, today: date
-) -> dict:
+) -> dict[str, Any]:
     """Return the balance row for (employee, type, year), creating/refreshing
     the accrued figure from the leave type's accrual config."""
     lt = (
@@ -86,18 +87,19 @@ async def ensure_balance(
         ).mappings().one()
         return dict(row)
 
+    result = dict(existing)
     # refresh accrued (monthly types grow through the year)
-    if existing["accrued"] != accrued:
+    if result["accrued"] != accrued:
         await session.execute(
             text("""update ihrms.leave_balance set accrued = :acc, updated_at = now()
                     where id = :id"""),
-            {"acc": accrued, "id": existing["id"]},
+            {"acc": accrued, "id": result["id"]},
         )
-        existing = {**existing, "accrued": accrued}
-    return dict(existing)
+        result["accrued"] = accrued
+    return result
 
 
-def available(balance: dict) -> Decimal:
+def available(balance: dict[str, Any]) -> Decimal:
     """Days an employee can still take: accrued + carried_forward − used − pending."""
     return (
         Decimal(balance["accrued"])
