@@ -6,6 +6,7 @@ import {
   approveIncrement,
   createCycle,
   enrollCycle,
+  fetchCalibration,
   fetchCycleReviews,
   fetchCycles,
   fetchGoals,
@@ -17,6 +18,7 @@ import {
   submitManagerReview,
   submitSelfReview,
   updateGoal,
+  type Calibration,
   type Goal,
   type Review,
   type ReviewCycle,
@@ -258,10 +260,72 @@ function MyPanel({ onError }: { onError: (m: string) => void }) {
   );
 }
 
+function CalibrationPanel({ cycleId, onError }: { cycleId: string; onError: (m: string) => void }) {
+  const [cal, setCal] = useState<Calibration | null>(null);
+  useEffect(() => {
+    fetchCalibration(cycleId).then(setCal).catch((e) => onError(e.message));
+  }, [cycleId, onError]);
+  if (!cal) return null;
+
+  const maxPct = Math.max(
+    1,
+    ...cal.buckets.flatMap((b) => [Number(b.actual_pct), Number(b.target_pct)]),
+  );
+  return (
+    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-ink">Calibration · forced distribution</h2>
+        <span className="text-[11px] text-mute">
+          {cal.rated_count} rated · {cal.pending_count} pending
+        </span>
+      </div>
+      <div className="space-y-2.5">
+        {cal.buckets.map((b) => {
+          const delta = Number(b.delta_pct);
+          return (
+            <div key={b.rating} className="flex items-center gap-3 text-sm">
+              <span className="w-28 shrink-0 text-mute">
+                <span className="text-amber">{"★".repeat(b.rating)}</span>{" "}
+                <span className="text-[11px]">{b.label}</span>
+              </span>
+              <div className="relative h-5 flex-1 rounded bg-line-2">
+                {/* target marker */}
+                <div
+                  className="absolute top-0 h-5 w-0.5 bg-ink/40"
+                  style={{ left: `${(Number(b.target_pct) / maxPct) * 100}%` }}
+                  title={`target ${b.target_pct}%`}
+                />
+                <div
+                  className="h-5 rounded bg-indigo"
+                  style={{ width: `${(Number(b.actual_pct) / maxPct) * 100}%` }}
+                />
+              </div>
+              <span className="w-10 text-right font-mono text-[11px] text-ink">{b.count}</span>
+              <span
+                className={`w-16 text-right font-mono text-[11px] ${
+                  delta > 0 ? "text-warn-strong" : delta < 0 ? "text-blue-strong" : "text-mute-2"
+                }`}
+              >
+                {delta > 0 ? "+" : ""}
+                {b.delta_pct}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-[10px] text-mute-2">
+        Bars show the cohort&apos;s manager-rating spread; the tick marks the target curve.
+        Positive delta = over-represented vs target. Adjust at publish (final rating override).
+      </p>
+    </section>
+  );
+}
+
 export default function PerformancePage() {
   const [isHr, setIsHr] = useState(false);
   const [cycles, setCycles] = useState<ReviewCycle[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [calibrating, setCalibrating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reloadCycles = useCallback(() => {
@@ -336,6 +400,9 @@ export default function PerformancePage() {
                   <button onClick={() => enroll(c.id)} className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink">
                     Enroll all
                   </button>
+                  <button onClick={() => setCalibrating(calibrating === c.id ? null : c.id)} className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink">
+                    {calibrating === c.id ? "Hide" : "Calibrate"}
+                  </button>
                   <button onClick={() => setSelected(selected === c.id ? null : c.id)} className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink">
                     {selected === c.id ? "Hide" : "Reviews"}
                   </button>
@@ -345,6 +412,8 @@ export default function PerformancePage() {
           </div>
         </section>
       )}
+
+      {isHr && calibrating && <CalibrationPanel cycleId={calibrating} onError={setError} />}
 
       {isHr && selected && <CycleReviews cycleId={selected} onError={setError} />}
 

@@ -647,6 +647,23 @@ export function enrollCycle(id: string): Promise<ReviewCycle> {
 export function fetchCycleReviews(id: string): Promise<Review[]> {
   return apiGet<Review[]>(`/performance/cycles/${id}/reviews`);
 }
+export interface CalibrationBucket {
+  rating: number;
+  label: string;
+  count: number;
+  actual_pct: string;
+  target_pct: string;
+  delta_pct: string;
+}
+export interface Calibration {
+  cycle_id: string;
+  rated_count: number;
+  pending_count: number;
+  buckets: CalibrationBucket[];
+}
+export function fetchCalibration(cycleId: string): Promise<Calibration> {
+  return apiGet<Calibration>(`/performance/cycles/${cycleId}/calibration`);
+}
 export function fetchMyReviews(): Promise<Review[]> {
   return apiGet<Review[]>("/performance/reviews/mine");
 }

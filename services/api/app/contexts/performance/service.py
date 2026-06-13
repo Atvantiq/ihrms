@@ -1,8 +1,18 @@
 """Performance logic — rating bands, 9-box, suggested increment (pure)."""
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from app.core.money import D, round_rupee
+
+# Default forced-distribution target (% of cohort) per rating 5..1 — a mild bell.
+FORCED_CURVE: dict[int, Decimal] = {
+    5: Decimal("10"),
+    4: Decimal("20"),
+    3: Decimal("40"),
+    2: Decimal("20"),
+    1: Decimal("10"),
+}
 
 # Suggested annual increment % by final rating (1–5). Guardrailed by HR later.
 INCREMENT_PCT_BY_RATING = {
@@ -48,3 +58,40 @@ def suggested_increment_pct(rating: int) -> Decimal:
 def apply_increment(current_ctc: Decimal, pct: Decimal) -> Decimal:
     """New CTC after an increment percentage (rounded to the rupee)."""
     return round_rupee(current_ctc * (D(1) + pct / D(100)))
+
+
+@dataclass(frozen=True)
+class CalibrationBucket:
+    rating: int
+    label: str
+    count: int
+    actual_pct: Decimal
+    target_pct: Decimal
+    delta_pct: Decimal  # actual − target; positive = over-represented vs the curve
+
+
+def calibrate(
+    ratings: list[int], target_curve: dict[int, Decimal] | None = None
+) -> list[CalibrationBucket]:
+    """Compare a cohort's rating spread against a forced-distribution target.
+
+    Returns one bucket per rating 5..1 with the count, the actual share, the
+    target share and the delta. `ratings` may be empty (all shares 0).
+    """
+    curve = target_curve or FORCED_CURVE
+    total = len(ratings)
+    out: list[CalibrationBucket] = []
+    for r in (5, 4, 3, 2, 1):
+        count = sum(1 for x in ratings if x == r)
+        actual = (
+            Decimal(0) if total == 0
+            else (Decimal(count) / Decimal(total) * Decimal(100)).quantize(Decimal("0.1"))
+        )
+        target = curve.get(r, Decimal(0))
+        out.append(
+            CalibrationBucket(
+                rating=r, label=RATING_LABEL[r], count=count,
+                actual_pct=actual, target_pct=target, delta_pct=actual - target,
+            )
+        )
+    return out

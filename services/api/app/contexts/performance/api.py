@@ -18,6 +18,7 @@ from app.contexts.identity.principal import (
 from app.contexts.payroll.salary import derive_structure
 from app.contexts.performance.service import (
     apply_increment,
+    calibrate,
     nine_box,
     nine_box_label,
     suggested_increment_pct,
@@ -262,6 +263,51 @@ async def cycle_reviews(
         )
     ).mappings().all()
     return [_to_review(dict(r), principal) for r in rows]
+
+
+class CalibrationBucketOut(BaseModel):
+    rating: int
+    label: str
+    count: int
+    actual_pct: Decimal
+    target_pct: Decimal
+    delta_pct: Decimal
+
+
+class CalibrationOut(BaseModel):
+    cycle_id: str
+    rated_count: int
+    pending_count: int
+    buckets: list[CalibrationBucketOut]
+
+
+@router.get("/cycles/{cycle_id}/calibration", response_model=CalibrationOut)
+async def cycle_calibration(
+    cycle_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> CalibrationOut:
+    """Forced-distribution view: the cohort's manager-rating spread vs the target
+    curve. Uses manager_rating (the calibration input) before final publish."""
+    rows = (
+        await session.execute(
+            text("""select manager_rating, status from ihrms.review
+                    where cycle_id = cast(:c as uuid)"""),
+            {"c": cycle_id},
+        )
+    ).mappings().all()
+    ratings = [r["manager_rating"] for r in rows if r["manager_rating"] is not None]
+    buckets = [
+        CalibrationBucketOut(
+            rating=b.rating, label=b.label, count=b.count,
+            actual_pct=b.actual_pct, target_pct=b.target_pct, delta_pct=b.delta_pct,
+        )
+        for b in calibrate(ratings)
+    ]
+    return CalibrationOut(
+        cycle_id=cycle_id, rated_count=len(ratings),
+        pending_count=len(rows) - len(ratings), buckets=buckets,
+    )
 
 
 @router.get("/reviews/mine", response_model=list[ReviewOut])
