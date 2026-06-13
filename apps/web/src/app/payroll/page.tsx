@@ -27,7 +27,9 @@ function inr(v: string | number): string {
 function SalaryPanel({ employees }: { employees: EmployeeListItem[] }) {
   const [emp, setEmp] = useState("");
   const [ctc, setCtc] = useState("");
+  const [regime, setRegime] = useState<"new" | "old">("new");
   const [preview, setPreview] = useState<StructurePreview | null>(null);
+  const [tds, setTds] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,9 +47,10 @@ function SalaryPanel({ employees }: { employees: EmployeeListItem[] }) {
   async function save() {
     if (!emp || !ctc) return;
     try {
-      await setStructure(Number(emp), Number(ctc), "2026-04-01");
+      const saved = await setStructure(Number(emp), Number(ctc), "2026-04-01", regime);
+      setTds(saved.monthly_tds);
       setMsg("Saved ✓");
-      setTimeout(() => setMsg(null), 2000);
+      setTimeout(() => setMsg(null), 2500);
     } catch (e) {
       setMsg((e as Error).message);
     }
@@ -85,6 +88,19 @@ function SalaryPanel({ employees }: { employees: EmployeeListItem[] }) {
             className="w-36 rounded-lg border border-line bg-surface px-3 py-2 text-sm"
           />
         </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-mute">
+            Tax regime
+          </label>
+          <select
+            value={regime}
+            onChange={(e) => setRegime(e.target.value as "new" | "old")}
+            className="rounded-lg border border-line bg-surface px-2 py-2 text-sm"
+          >
+            <option value="new">New</option>
+            <option value="old">Old</option>
+          </select>
+        </div>
         <button
           onClick={save}
           disabled={!emp || !ctc}
@@ -100,6 +116,12 @@ function SalaryPanel({ employees }: { employees: EmployeeListItem[] }) {
           <span>HRA <b className="text-ink">{inr(preview.hra)}</b></span>
           <span>Special <b className="text-ink">{inr(preview.special_allowance)}</b></span>
           <span>Gross/mo <b className="text-ink">{inr(preview.gross_monthly)}</b></span>
+          {tds !== null && (
+            <span>
+              Monthly TDS <b className="text-red-strong">{inr(tds)}</b>{" "}
+              <span className="text-mute-2">({regime} regime)</span>
+            </span>
+          )}
         </div>
       )}
     </section>
@@ -124,6 +146,7 @@ function Register({ runId }: { runId: string }) {
             <th className="px-3 py-2 font-semibold">Gross</th>
             <th className="px-3 py-2 font-semibold">PF</th>
             <th className="px-3 py-2 font-semibold">PT</th>
+            <th className="px-3 py-2 font-semibold">TDS</th>
             <th className="px-3 py-2 font-semibold">Net pay</th>
           </tr>
         </thead>
@@ -137,12 +160,13 @@ function Register({ runId }: { runId: string }) {
               <td className="px-3 py-2 text-ink">{inr(p.gross)}</td>
               <td className="px-3 py-2 text-red-strong">{inr(p.deductions.pf_employee ?? 0)}</td>
               <td className="px-3 py-2 text-red-strong">{inr(p.deductions.pt ?? 0)}</td>
+              <td className="px-3 py-2 text-red-strong">{inr(p.deductions.tds ?? 0)}</td>
               <td className="px-3 py-2 font-semibold text-ink">{inr(p.net_pay)}</td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-4 py-6 text-center text-mute">
+              <td colSpan={9} className="px-4 py-6 text-center text-mute">
                 No payslips — set salary structures, then run payroll.
               </td>
             </tr>

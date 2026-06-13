@@ -316,6 +316,12 @@ export interface StructurePreview {
   gross_monthly: string;
 }
 
+export interface StructureSaved extends StructurePreview {
+  employee_id: number;
+  tax_regime: string;
+  monthly_tds: string;
+}
+
 export interface PayrollRun {
   id: string;
   period_year: number;
@@ -349,10 +355,14 @@ export async function setStructure(
   employeeId: number,
   ctcAnnual: number,
   effectiveFrom: string,
-): Promise<StructurePreview & { employee_id: number }> {
+  taxRegime: "new" | "old" = "new",
+  chapterViaDeductions = 0,
+): Promise<StructureSaved> {
   return apiPut(`/payroll/structures/${employeeId}`, {
     ctc_annual: ctcAnnual,
     effective_from: effectiveFrom,
+    tax_regime: taxRegime,
+    chapter_via_deductions: chapterViaDeductions,
   });
 }
 

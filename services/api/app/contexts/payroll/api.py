@@ -3,7 +3,7 @@
 import json
 from datetime import date
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -17,6 +17,7 @@ from app.contexts.identity.principal import (
     require_roles,
 )
 from app.contexts.payroll.salary import SalaryStructure, compute_payslip, derive_structure
+from app.contexts.payroll.tds import monthly_tds
 from app.core.audit import record_audit
 from app.core.db import get_session
 from app.core.money import D
@@ -33,6 +34,8 @@ class StructureIn(BaseModel):
     hra: Decimal | None = None
     special_allowance: Decimal | None = None
     effective_from: date
+    tax_regime: Literal["new", "old"] = "new"
+    chapter_via_deductions: Decimal = D(0)  # 80C etc. (old regime only)
 
 
 class StructureOut(BaseModel):
@@ -43,6 +46,9 @@ class StructureOut(BaseModel):
     special_allowance: Decimal
     gross_monthly: Decimal
     effective_from: date
+    tax_regime: str = "new"
+    chapter_via_deductions: Decimal = D(0)
+    monthly_tds: Decimal = D(0)
 
 
 class PreviewOut(BaseModel):
@@ -121,19 +127,27 @@ async def set_structure(
     )
     await session.execute(
         text("""insert into ihrms.salary_structure
-                (employee_id, ctc_annual, basic, hra, special_allowance, effective_from)
-                values (:emp, :ctc, :basic, :hra, :special, :eff)"""),
+                (employee_id, ctc_annual, basic, hra, special_allowance, effective_from,
+                 tax_regime, chapter_via_deductions)
+                values (:emp, :ctc, :basic, :hra, :special, :eff, :regime, :ded)"""),
         {"emp": employee_id, "ctc": s.ctc_annual, "basic": s.basic, "hra": s.hra,
-         "special": s.special_allowance, "eff": payload.effective_from},
+         "special": s.special_allowance, "eff": payload.effective_from,
+         "regime": payload.tax_regime, "ded": payload.chapter_via_deductions},
     )
     await record_audit(
         session, principal, "salary.set", "employee", str(employee_id),
-        summary=f"Set CTC ₹{s.ctc_annual}", changes={"ctc_annual": str(s.ctc_annual)},
+        summary=f"Set CTC ₹{s.ctc_annual} ({payload.tax_regime} regime)",
+        changes={"ctc_annual": str(s.ctc_annual), "tax_regime": payload.tax_regime},
+    )
+    tds = monthly_tds(
+        s.gross, regime=payload.tax_regime,
+        chapter_via_deductions=payload.chapter_via_deductions,
     )
     out = StructureOut(
         employee_id=employee_id, ctc_annual=s.ctc_annual, basic=s.basic, hra=s.hra,
         special_allowance=s.special_allowance, gross_monthly=s.gross,
-        effective_from=payload.effective_from,
+        effective_from=payload.effective_from, tax_regime=payload.tax_regime,
+        chapter_via_deductions=payload.chapter_via_deductions, monthly_tds=tds,
     )
     await session.commit()
     return out
@@ -149,7 +163,8 @@ async def get_structure(
         raise HTTPException(403, "You can only view your own salary")
     row = (
         await session.execute(
-            text("""select ctc_annual, basic, hra, special_allowance, effective_from
+            text("""select ctc_annual, basic, hra, special_allowance, effective_from,
+                       tax_regime, chapter_via_deductions
                     from ihrms.salary_structure
                     where employee_id = :emp and is_active"""),
             {"emp": employee_id},
@@ -157,11 +172,17 @@ async def get_structure(
     ).mappings().first()
     if row is None:
         raise HTTPException(404, "No salary structure set")
+    gross = row["basic"] + row["hra"] + row["special_allowance"]
     return StructureOut(
         employee_id=employee_id, ctc_annual=row["ctc_annual"], basic=row["basic"],
         hra=row["hra"], special_allowance=row["special_allowance"],
-        gross_monthly=row["basic"] + row["hra"] + row["special_allowance"],
-        effective_from=row["effective_from"],
+        gross_monthly=gross, effective_from=row["effective_from"],
+        tax_regime=row["tax_regime"],
+        chapter_via_deductions=row["chapter_via_deductions"],
+        monthly_tds=monthly_tds(
+            gross, regime=row["tax_regime"],
+            chapter_via_deductions=row["chapter_via_deductions"],
+        ),
     )
 
 
@@ -216,7 +237,8 @@ async def create_run(
 
     structures = (
         await session.execute(
-            text("""select employee_id, ctc_annual, basic, hra, special_allowance
+            text("""select employee_id, ctc_annual, basic, hra, special_allowance,
+                       tax_regime, chapter_via_deductions
                     from ihrms.salary_structure where is_active""")
         )
     ).mappings().all()
@@ -226,7 +248,11 @@ async def create_run(
     for st in structures:
         s = SalaryStructure(st["ctc_annual"], st["basic"], st["hra"],
                             st["special_allowance"])
-        slip = compute_payslip(s, working_days=payload.working_days)
+        tds = monthly_tds(
+            s.gross, regime=st["tax_regime"],
+            chapter_via_deductions=st["chapter_via_deductions"],
+        )
+        slip = compute_payslip(s, working_days=payload.working_days, declared_tds=tds)
         await session.execute(
             text("""insert into ihrms.payslip
                     (run_id, employee_id, lop_days, earnings, deductions,
