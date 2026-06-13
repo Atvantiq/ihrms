@@ -53,6 +53,7 @@ const CONSENT_DOT: Record<ConsentLine["status"], string> = {
 };
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
+import { EmployeeRecords } from "@/components/EmployeeRecords";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -220,6 +221,8 @@ export default function ProfilePage({
           🔒 Personal details are visible to HR and the employee only.
         </div>
       )}
+
+      {emp.pii_visible && <EmployeeRecords employeeId={empIdNum} isHr={isHr} />}
 
       {emp.pii_visible && structure && (
         <Section title="Compensation">

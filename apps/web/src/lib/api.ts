@@ -1250,6 +1250,108 @@ export function previewSalaryStructure(ctcAnnual: string): Promise<SalaryConfigP
   );
 }
 
+// -------------------------------------------------- employee 360 records
+
+export interface FamilyMember {
+  id: string;
+  relation: string;
+  full_name: string;
+  date_of_birth: string | null;
+  gender: string | null;
+  is_dependent: boolean;
+  is_nominee: boolean;
+  nominee_share: string;
+  contact: string | null;
+}
+export interface Education {
+  id: string;
+  degree: string;
+  specialization: string | null;
+  institution: string | null;
+  year_completed: number | null;
+  grade: string | null;
+}
+export interface Experience {
+  id: string;
+  employer: string;
+  designation: string | null;
+  from_date: string | null;
+  to_date: string | null;
+  summary: string | null;
+}
+export interface Award {
+  id: string;
+  title: string;
+  category: string | null;
+  awarded_on: string | null;
+  citation: string | null;
+}
+export interface Training {
+  id: string;
+  program: string;
+  provider: string | null;
+  status: "planned" | "in_progress" | "completed" | "cancelled";
+  completed_on: string | null;
+}
+export interface Incident {
+  id: string;
+  kind: "disciplinary" | "accident";
+  incident_date: string;
+  category: string | null;
+  severity: "low" | "medium" | "high";
+  description: string;
+  action_taken: string | null;
+  status: "open" | "closed";
+}
+export interface SpecialDate {
+  label: string;
+  on: string;
+  in_days: number;
+  years: number | null;
+}
+export interface EmployeeRecords {
+  employee_id: number;
+  family: FamilyMember[];
+  education: Education[];
+  experience: Experience[];
+  awards: Award[];
+  training: Training[];
+  incidents: Incident[];
+  special_dates: SpecialDate[];
+  nominee_total: string;
+}
+export type RecordResource =
+  | "family"
+  | "education"
+  | "experience"
+  | "awards"
+  | "training"
+  | "incidents";
+
+export function fetchEmployeeRecords(employeeId: number): Promise<EmployeeRecords> {
+  return apiGet<EmployeeRecords>(`/employees/${employeeId}/records`);
+}
+export function addEmployeeRecord<T>(
+  employeeId: number,
+  resource: RecordResource,
+  body: Record<string, unknown>,
+): Promise<T> {
+  return apiPost<T>(`/employees/${employeeId}/${resource}`, body);
+}
+export async function deleteEmployeeRecord(
+  employeeId: number,
+  resource: RecordResource,
+  recordId: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/employees/${employeeId}/records/${resource}/${recordId}`,
+    { method: "DELETE", headers: { ...(await authHeader()) } },
+  );
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Delete failed (${res.status})`);
+  }
+}
+
 // ----------------------------------------------------------------- payroll
 
 export interface StructurePreview {
