@@ -264,6 +264,66 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- timesheet
+
+export interface Project {
+  id: string;
+  code: string;
+  name: string;
+  client: string | null;
+}
+
+export interface TimesheetWeek {
+  employee_id: number;
+  week_start: string;
+  dates: string[];
+  status: string;
+  entries: { project_id: string; work_date: string; hours: string }[];
+  total_hours: string;
+  overtime: string;
+  approver_name: string | null;
+  decision_note: string | null;
+  can_decide: boolean;
+}
+
+export function fetchProjects(): Promise<Project[]> {
+  return apiGet<Project[]>("/timesheet/projects");
+}
+
+export function fetchWeek(weekOf: string, employeeId?: number): Promise<TimesheetWeek> {
+  const e = employeeId ? `&employee_id=${employeeId}` : "";
+  return apiGet<TimesheetWeek>(`/timesheet/week?week_of=${weekOf}${e}`);
+}
+
+export function logHours(
+  projectId: string,
+  workDate: string,
+  hours: number,
+): Promise<TimesheetWeek> {
+  return apiPost<TimesheetWeek>("/timesheet/entries", {
+    project_id: projectId,
+    work_date: workDate,
+    hours,
+  });
+}
+
+export function submitWeek(weekOf: string): Promise<TimesheetWeek> {
+  return apiPost<TimesheetWeek>(`/timesheet/week/submit?week_of=${weekOf}`, {});
+}
+
+export function decideWeek(
+  action: "approve" | "reject",
+  employeeId: number,
+  weekOf: string,
+  note?: string,
+): Promise<TimesheetWeek> {
+  return apiPost<TimesheetWeek>(`/timesheet/week/${action}`, {
+    employee_id: employeeId,
+    week_of: weekOf,
+    note: note ?? null,
+  });
+}
+
 // ----------------------------------------------------------------- attendance
 
 export interface AttendanceSummary {

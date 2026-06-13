@@ -33,7 +33,7 @@ export const NAV: NavSection[] = [
       { label: "Leave", href: "/leave", icon: "◰" },
       { label: "Holidays", href: "/settings/holidays", icon: "▤" },
       { label: "Attendance", href: "/attendance", icon: "⏱" },
-      { label: "Timesheet", href: "/timesheet", icon: "⊞", comingSoon: true },
+      { label: "Timesheet", href: "/timesheet", icon: "⊞" },
     ],
   },
   {
