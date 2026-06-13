@@ -23,6 +23,7 @@ from app.contexts.identity.principal import (
 )
 from app.core.audit import record_audit
 from app.core.db import get_session
+from app.core.money import D
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 HR = require_roles(ROLE_HR_ADMIN)
@@ -89,6 +90,59 @@ async def list_assets(
     ).mappings().all()
     today = date.today()
     return [_to_out(dict(r), today) for r in rows]
+
+
+class DepreciationLine(BaseModel):
+    id: str
+    asset_tag: str
+    name: str
+    category: str
+    purchase_cost: Decimal
+    book_value: Decimal
+    depreciated: Decimal
+
+
+class DepreciationReport(BaseModel):
+    lines: list[DepreciationLine]
+    total_cost: Decimal
+    total_book_value: Decimal
+    total_depreciated: Decimal
+
+
+@router.get("/depreciation", response_model=DepreciationReport)
+async def depreciation_report(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> DepreciationReport:
+    """Straight-line written-down value of every costed asset (the drawer's
+    Finance & depreciation view, aggregated)."""
+    rows = (
+        await session.execute(
+            text("""select a.id::text, a.asset_tag, a.name, a.category,
+                       a.purchase_cost, a.purchase_date
+                    from ihrms.asset a
+                    where a.status <> 'retired' and a.purchase_cost is not null
+                    order by a.purchase_cost desc""")
+        )
+    ).mappings().all()
+    today = date.today()
+    lines: list[DepreciationLine] = []
+    total_cost = total_bv = D(0)
+    for r in rows:
+        cost = Decimal(str(r["purchase_cost"]))
+        bv = book_value(cost, r["purchase_date"], today, category=r["category"])
+        lines.append(
+            DepreciationLine(
+                id=r["id"], asset_tag=r["asset_tag"], name=r["name"], category=r["category"],
+                purchase_cost=cost, book_value=bv, depreciated=cost - bv,
+            )
+        )
+        total_cost += cost
+        total_bv += bv
+    return DepreciationReport(
+        lines=lines, total_cost=total_cost, total_book_value=total_bv,
+        total_depreciated=total_cost - total_bv,
+    )
 
 
 @router.get("/employee/{employee_id}", response_model=list[AssetOut])

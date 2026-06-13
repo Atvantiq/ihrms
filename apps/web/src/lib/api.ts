@@ -1444,6 +1444,25 @@ export function fetchAssets(): Promise<Asset[]> {
 export function fetchEmployeeAssets(employeeId: number): Promise<Asset[]> {
   return apiGet<Asset[]>(`/assets/employee/${employeeId}`);
 }
+
+export interface DepreciationLine {
+  id: string;
+  asset_tag: string;
+  name: string;
+  category: string;
+  purchase_cost: string;
+  book_value: string;
+  depreciated: string;
+}
+export interface DepreciationReport {
+  lines: DepreciationLine[];
+  total_cost: string;
+  total_book_value: string;
+  total_depreciated: string;
+}
+export function fetchDepreciation(): Promise<DepreciationReport> {
+  return apiGet<DepreciationReport>("/assets/depreciation");
+}
 export function createAsset(body: {
   asset_tag: string;
   category: string;

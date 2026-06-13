@@ -5,9 +5,11 @@ import {
   assignAsset,
   createAsset,
   fetchAssets,
+  fetchDepreciation,
   fetchEmployees,
   returnAsset,
   type Asset,
+  type DepreciationReport,
   type EmployeeListItem,
 } from "@/lib/api";
 
@@ -31,9 +33,12 @@ export default function AssetsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [dep, setDep] = useState<DepreciationReport | null>(null);
+  const [showDep, setShowDep] = useState(false);
 
   const reload = useCallback(() => {
     fetchAssets().then(setAssets).catch((e) => setError(e.message));
+    fetchDepreciation().then(setDep).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -93,13 +98,57 @@ export default function AssetsPage() {
           <h1 className="text-xl font-semibold text-ink">Assets</h1>
           <p className="text-xs text-mute">Company asset register · assignments · book value</p>
         </div>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
-        >
-          + New asset
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDep(!showDep)}
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
+          >
+            {showDep ? "Hide" : "Finance & depreciation"}
+          </button>
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
+          >
+            + New asset
+          </button>
+        </div>
       </div>
+
+      {showDep && dep && (
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <div className="flex flex-wrap items-center gap-4 border-b border-line px-4 py-3">
+            <span className="text-sm font-semibold text-ink">Finance &amp; depreciation</span>
+            <span className="text-[11px] text-mute">
+              Cost <span className="font-semibold text-ink">{inr(dep.total_cost)}</span> ·
+              Book value <span className="font-semibold text-green">{inr(dep.total_book_value)}</span> ·
+              Depreciated <span className="font-semibold text-warn-strong">{inr(dep.total_depreciated)}</span>
+            </span>
+          </div>
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-[10px] uppercase tracking-wider text-mute">
+                <th className="px-4 py-2 font-semibold">Asset</th>
+                <th className="px-3 py-2 font-semibold">Cost</th>
+                <th className="px-3 py-2 font-semibold">Book value</th>
+                <th className="px-3 py-2 font-semibold">Depreciated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dep.lines.map((l) => (
+                <tr key={l.id} className="border-b border-line-2 last:border-0">
+                  <td className="px-4 py-2">
+                    <span className="font-mono text-[10px] text-mute">{l.asset_tag}</span>
+                    <span className="ml-2 text-ink">{l.name}</span>
+                  </td>
+                  <td className="px-3 py-2 text-mute">{inr(l.purchase_cost)}</td>
+                  <td className="px-3 py-2 font-semibold text-ink">{inr(l.book_value)}</td>
+                  <td className="px-3 py-2 text-warn-strong">{inr(l.depreciated)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {error && (
         <div className="rounded-xl border border-red-soft bg-red-soft/50 p-3 text-sm text-red-strong">
