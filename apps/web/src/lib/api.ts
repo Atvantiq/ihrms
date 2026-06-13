@@ -264,6 +264,100 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- payroll
+
+export interface StructurePreview {
+  ctc_annual: string;
+  basic: string;
+  hra: string;
+  special_allowance: string;
+  gross_monthly: string;
+}
+
+export interface PayrollRun {
+  id: string;
+  period_year: number;
+  period_month: number;
+  working_days: number;
+  status: string;
+  employee_count: number;
+  total_gross: string;
+  total_net: string;
+}
+
+export interface Payslip {
+  employee_id: number;
+  employee_name: string;
+  period_year: number;
+  period_month: number;
+  lop_days: string;
+  earnings: Record<string, string>;
+  deductions: Record<string, string>;
+  employer_contributions: Record<string, string>;
+  gross: string;
+  total_deductions: string;
+  net_pay: string;
+}
+
+export function previewStructure(ctcAnnual: number): Promise<StructurePreview> {
+  return apiGet<StructurePreview>(`/payroll/preview?ctc_annual=${ctcAnnual}`);
+}
+
+export async function setStructure(
+  employeeId: number,
+  ctcAnnual: number,
+  effectiveFrom: string,
+): Promise<StructurePreview & { employee_id: number }> {
+  return apiPut(`/payroll/structures/${employeeId}`, {
+    ctc_annual: ctcAnnual,
+    effective_from: effectiveFrom,
+  });
+}
+
+export function fetchRuns(): Promise<PayrollRun[]> {
+  return apiGet<PayrollRun[]>("/payroll/runs");
+}
+
+export function createRun(
+  year: number,
+  month: number,
+  workingDays: number,
+): Promise<PayrollRun> {
+  return apiPost<PayrollRun>("/payroll/runs", {
+    period_year: year,
+    period_month: month,
+    working_days: workingDays,
+  });
+}
+
+export function finalizeRun(id: string): Promise<PayrollRun> {
+  return apiPost<PayrollRun>(`/payroll/runs/${id}/finalize`, {});
+}
+
+export function fetchRegister(runId: string): Promise<Payslip[]> {
+  return apiGet<Payslip[]>(`/payroll/runs/${runId}/register`);
+}
+
+async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(await authHeader()),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = await res.text();
+    try {
+      detail = JSON.parse(detail).detail ?? detail;
+    } catch {}
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  return res.json() as Promise<T>;
+}
+
 // ----------------------------------------------------------------- dashboard
 
 export interface DashboardSummary {
