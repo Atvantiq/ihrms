@@ -768,6 +768,43 @@ export function markAttendance(
   });
 }
 
+// ----------------------------------------------------------------- feedback
+
+export interface Feedback {
+  id: string;
+  from_employee_id: number;
+  from_name: string | null;
+  to_employee_id: number;
+  to_name: string | null;
+  kind: "feedback" | "recognition";
+  badge: string | null;
+  visibility: "private" | "public";
+  message: string;
+  created_at: string;
+}
+
+export function fetchBadges(): Promise<string[]> {
+  return apiGet<string[]>("/feedback/badges");
+}
+export function giveFeedback(body: {
+  to_employee_id: number;
+  kind: "feedback" | "recognition";
+  badge?: string | null;
+  visibility: "private" | "public";
+  message: string;
+}): Promise<Feedback> {
+  return apiPost<Feedback>("/feedback", body);
+}
+export function fetchReceived(employeeId?: number): Promise<Feedback[]> {
+  return apiGet<Feedback[]>(`/feedback/received${employeeId ? `?employee_id=${employeeId}` : ""}`);
+}
+export function fetchGiven(): Promise<Feedback[]> {
+  return apiGet<Feedback[]>("/feedback/given");
+}
+export function fetchWall(): Promise<Feedback[]> {
+  return apiGet<Feedback[]>("/feedback/wall");
+}
+
 // ----------------------------------------------------------------- shifts
 
 export interface Shift {

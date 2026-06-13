@@ -11,6 +11,7 @@ from app.contexts.control_plane.api import router as control_plane_router
 from app.contexts.core_hr.api import router as employees_router
 from app.contexts.dashboard.api import router as dashboard_router
 from app.contexts.exit_fnf.api import router as exit_router
+from app.contexts.feedback.api import router as feedback_router
 from app.contexts.identity.api import router as me_router
 from app.contexts.identity.dev_login import router as dev_login_router
 from app.contexts.leave.api import router as leave_router
@@ -39,6 +40,7 @@ api_router.include_router(tax_router)
 api_router.include_router(shifts_router)
 api_router.include_router(overtime_router)
 api_router.include_router(comp_off_router)
+api_router.include_router(feedback_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)
