@@ -160,6 +160,37 @@ async def inbox(
             )
         )
 
+    # 2d) Comp-off approvals waiting on me.
+    if is_hr:
+        co_pending = await _scalar(
+            session,
+            "select count(*) from ihrms.comp_off where status='pending' and employee_id != :me",
+            me=me,
+        )
+    else:
+        co_pending = await _scalar(
+            session,
+            """select count(*) from ihrms.comp_off c
+               where c.status='pending' and c.employee_id != :me
+                 and c.employee_id in (
+                   select employee_id from public.job_details
+                   where reporting_manager = :me and is_active = 1)""",
+            me=me,
+        )
+    if co_pending:
+        decisions.append(
+            Decision(
+                kind="comp_off_approvals",
+                severity=severity_for_count(co_pending, high_at=8),
+                icon="◰",
+                title=f"{co_pending} comp-off request{'s' if co_pending != 1 else ''} to review",
+                detail="Compensatory-off credits awaiting your approval.",
+                action_label="Review",
+                action_href="/tasks",
+                count=co_pending,
+            )
+        )
+
     # The remaining signals are HR/platform decisions.
     if is_hr:
         # 3) Increment proposals awaiting approval.

@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  availCompOff,
+  earnCompOff,
   fetchAttendance,
+  fetchCompOff,
   fetchEmployees,
   fetchMe,
   fetchOvertime,
@@ -11,10 +14,19 @@ import {
   markAttendance,
   requestRegularization,
   type AttendanceSummary,
+  type CompOff,
   type EmployeeListItem,
   type Overtime,
   type Regularization,
 } from "@/lib/api";
+
+const CO_STATUS_STYLE: Record<CompOff["status"], string> = {
+  pending: "bg-warn-soft text-warn-strong",
+  approved: "bg-green-soft text-green-strong",
+  rejected: "bg-red-soft text-red-strong",
+  availed: "bg-blue-soft text-blue-strong",
+  expired: "bg-line-2 text-mute",
+};
 
 const REG_STATUS_STYLE: Record<Regularization["status"], string> = {
   pending: "bg-warn-soft text-warn-strong",
@@ -69,6 +81,7 @@ export default function AttendancePage() {
   const [data, setData] = useState<AttendanceSummary | null>(null);
   const [regs, setRegs] = useState<Regularization[]>([]);
   const [ot, setOt] = useState<Overtime[]>([]);
+  const [compOff, setCompOff] = useState<CompOff[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,8 +104,35 @@ export default function AttendancePage() {
   const loadRegs = useCallback(() => {
     fetchRegularizations("mine").then(setRegs).catch(() => {});
     fetchOvertime("mine").then(setOt).catch(() => {});
+    fetchCompOff("mine").then(setCompOff).catch(() => {});
   }, []);
   useEffect(loadRegs, [loadRegs]);
+
+  async function submitCompOff(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await earnCompOff({
+        earned_date: fd.get("earned_date") as string,
+        reason: fd.get("reason") as string,
+      });
+      form.reset();
+      loadRegs();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  async function avail(id: string) {
+    const d = prompt("Avail comp-off on date (YYYY-MM-DD)?");
+    if (!d) return;
+    try {
+      await availCompOff(id, d);
+      loadRegs();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   async function submitOt(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -302,6 +342,49 @@ export default function AttendancePage() {
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${OT_STATUS_STYLE[o.status]}`}>
                     {o.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+              Comp-off
+              <span className="ml-2 font-normal text-mute">
+                worked a holiday/weekend? earn a day off (valid 90 days)
+              </span>
+            </div>
+            <form onSubmit={submitCompOff} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+              <input name="earned_date" type="date" required className="rounded-lg border border-line px-2 py-2 text-sm text-mute" />
+              <input name="reason" required maxLength={300} placeholder="Reason (e.g. weekend release)" className="min-w-48 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+              <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Earn comp-off</button>
+            </form>
+            <div className="divide-y divide-line-2">
+              {compOff.length === 0 && (
+                <p className="px-4 py-3 text-sm text-mute">No comp-off credits.</p>
+              )}
+              {compOff.map((c) => (
+                <div key={c.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-ink">
+                    Worked {c.earned_date}
+                    <span className="ml-2 text-[11px] text-mute">{c.reason}</span>
+                    {c.expiry_date && c.status === "approved" && (
+                      <span className="ml-2 text-[11px] text-mute-2">expires {c.expiry_date}</span>
+                    )}
+                    {c.availed_on && (
+                      <span className="ml-2 text-[11px] text-mute-2">availed {c.availed_on}</span>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    {c.status === "approved" && (
+                      <button onClick={() => avail(c.id)} className="rounded-md border border-line px-2 py-0.5 text-[10px] text-mute hover:text-ink">
+                        Avail
+                      </button>
+                    )}
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${CO_STATUS_STYLE[c.status]}`}>
+                      {c.status}
+                    </span>
                   </span>
                 </div>
               ))}

@@ -5,6 +5,7 @@ from app.contexts.advances.api import router as advances_router
 from app.contexts.assets.api import router as assets_router
 from app.contexts.attendance.api import router as attendance_router
 from app.contexts.audit.api import router as audit_router
+from app.contexts.comp_off.api import router as comp_off_router
 from app.contexts.consent.api import router as consent_router
 from app.contexts.control_plane.api import router as control_plane_router
 from app.contexts.core_hr.api import router as employees_router
@@ -37,6 +38,7 @@ api_router.include_router(consent_router)
 api_router.include_router(tax_router)
 api_router.include_router(shifts_router)
 api_router.include_router(overtime_router)
+api_router.include_router(comp_off_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

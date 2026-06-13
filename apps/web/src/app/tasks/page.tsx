@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   approveIncrement,
+  decideCompOff,
   decideLeave,
   decideOvertime,
   decideRegularization,
@@ -18,10 +19,11 @@ const TYPE_META: Record<Task["task_type"], { label: string; tone: string }> = {
   increment: { label: "Increment", tone: "bg-green-soft text-green-strong" },
   regularization: { label: "Attendance", tone: "bg-warn-soft text-warn-strong" },
   overtime: { label: "Overtime", tone: "bg-pink-soft text-pink-strong" },
+  comp_off: { label: "Comp-off", tone: "bg-blue-soft text-blue-strong" },
 };
 
 const ORDER: Task["task_type"][] = [
-  "leave", "timesheet", "regularization", "overtime", "increment",
+  "leave", "timesheet", "regularization", "overtime", "comp_off", "increment",
 ];
 
 function taskKey(t: Task): string {
@@ -55,6 +57,8 @@ export default function TasksPage() {
         await decideRegularization(t.ref_id, action);
       } else if (t.task_type === "overtime") {
         await decideOvertime(t.ref_id, action);
+      } else if (t.task_type === "comp_off") {
+        await decideCompOff(t.ref_id, action);
       }
       reload();
     } catch (e) {

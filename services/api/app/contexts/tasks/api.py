@@ -26,7 +26,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 class Task(BaseModel):
     """One actionable approval, normalised across modules."""
 
-    task_type: Literal["leave", "timesheet", "increment", "regularization", "overtime"]
+    task_type: Literal[
+        "leave", "timesheet", "increment", "regularization", "overtime", "comp_off"
+    ]
     ref_id: str
     employee_id: int
     employee_name: str
@@ -174,6 +176,37 @@ async def list_tasks(
                 title=f"Overtime · {float(r['hours']):g}h",
                 subtitle=f"On {r['ot_date']}",
                 badge="OT",
+            )
+        )
+
+    # --- comp-off approvals (HR: org; manager: reports) -------------------
+    co_where = "c.status = 'pending' and c.employee_id != :me"
+    if not is_hr:
+        co_where += (
+            " and c.employee_id in (select employee_id from public.job_details"
+            " where reporting_manager = :me and is_active = 1)"
+        )
+    co_rows = (
+        await session.execute(
+            text(f"""select c.id::text, c.employee_id, c.earned_date,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.comp_off c
+                    left join public.employees e on e.employee_id = c.employee_id
+                    where {co_where}
+                    order by c.earned_date"""),
+            {"me": me},
+        )
+    ).mappings().all()
+    for r in co_rows:
+        tasks.append(
+            Task(
+                task_type="comp_off",
+                ref_id=r["id"],
+                employee_id=r["employee_id"],
+                employee_name=r["nm"] or "—",
+                title="Comp-off credit",
+                subtitle=f"Worked {r['earned_date']}",
+                badge="C-OFF",
             )
         )
 

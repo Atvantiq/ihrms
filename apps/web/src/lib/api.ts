@@ -875,6 +875,31 @@ export function decideOvertime(id: string, action: "approve" | "reject"): Promis
   return apiPost<Overtime>(`/overtime/${id}/${action}`, {});
 }
 
+export interface CompOff {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  earned_date: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected" | "availed" | "expired";
+  expiry_date: string | null;
+  availed_on: string | null;
+}
+export function fetchCompOff(
+  scope: "mine" | "pending" | "available" = "mine",
+): Promise<CompOff[]> {
+  return apiGet<CompOff[]>(`/comp-off?scope=${scope}`);
+}
+export function earnCompOff(body: { earned_date: string; reason: string }): Promise<CompOff> {
+  return apiPost<CompOff>("/comp-off", body);
+}
+export function decideCompOff(id: string, action: "approve" | "reject"): Promise<CompOff> {
+  return apiPost<CompOff>(`/comp-off/${id}/${action}`, {});
+}
+export function availCompOff(id: string, availDate: string): Promise<CompOff> {
+  return apiPost<CompOff>(`/comp-off/${id}/avail`, { avail_date: availDate });
+}
+
 // ----------------------------------------------------------------- payroll
 
 export interface StructurePreview {
@@ -1085,7 +1110,13 @@ export function fetchPulseInbox(): Promise<PulseDecision[]> {
 }
 
 export interface Task {
-  task_type: "leave" | "timesheet" | "increment" | "regularization" | "overtime";
+  task_type:
+    | "leave"
+    | "timesheet"
+    | "increment"
+    | "regularization"
+    | "overtime"
+    | "comp_off";
   ref_id: string;
   employee_id: number;
   employee_name: string;
