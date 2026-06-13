@@ -20,6 +20,7 @@ from app.contexts.identity.principal import (
     get_current_principal,
     require_roles,
 )
+from app.contexts.payroll.arrears import arrear_amount, retro_months
 from app.contexts.payroll.outputs import gl_journal, statutory_totals
 from app.contexts.payroll.pdf import payslip_pdf
 from app.contexts.payroll.returns import Member, ecr_file, esi_file, pt_file
@@ -129,13 +130,15 @@ async def set_structure(
     else:
         s = derive_structure(payload.ctc_annual)
 
-    prev_ctc = (
+    prev = (
         await session.execute(
-            text("""select ctc_annual from ihrms.salary_structure
+            text("""select ctc_annual, basic + hra + special_allowance as gross
+                    from ihrms.salary_structure
                     where employee_id = :emp and is_active"""),
             {"emp": employee_id},
         )
-    ).scalar()
+    ).mappings().first()
+    prev_ctc = prev["ctc_annual"] if prev else None
     await session.execute(
         text("""update ihrms.salary_structure set is_active = false
                 where employee_id = :emp and is_active"""),
@@ -160,6 +163,19 @@ async def set_structure(
         changes=[("ctc_annual", prev_ctc, s.ctc_annual)],
         changed_by=principal.employee_id, effective_date=payload.effective_from,
     )
+    # a back-dated change owes arrears for the months already paid at the old rate
+    if prev is not None:
+        months = retro_months(payload.effective_from, date.today())
+        arr = arrear_amount(Decimal(str(prev["gross"])), s.gross, months)
+        if arr != 0:
+            await session.execute(
+                text("""insert into ihrms.arrear
+                        (employee_id, amount, months, reason, effective_from, created_by)
+                        values (:e, :amt, :m, :reason, :eff, :by)"""),
+                {"e": employee_id, "amt": arr, "m": months,
+                 "reason": f"Salary revision effective {payload.effective_from}",
+                 "eff": payload.effective_from, "by": principal.employee_id},
+            )
     tds = monthly_tds(
         s.gross, regime=payload.tax_regime,
         chapter_via_deductions=payload.chapter_via_deductions,
@@ -314,11 +330,27 @@ async def create_run(
         if adv is not None:
             loan_recovery = emi_for_month(adv["emi_amount"], adv["outstanding"])
 
+        # pay out any pending arrears (back-dated salary revisions) this run
+        arrears = (
+            await session.execute(
+                text("""select coalesce(sum(amount), 0) from ihrms.arrear
+                        where employee_id = :emp and status = 'pending'"""),
+                {"emp": st["employee_id"]},
+            )
+        ).scalar()
+        arrears = D(str(arrears or 0))
+
         slip = compute_payslip(
             s, working_days=payload.working_days,
             lop_days=D(att.absent), declared_tds=tds, loan_recovery=loan_recovery,
-            rates=rates,
+            arrears=arrears, rates=rates,
         )
+        if arrears != 0:
+            await session.execute(
+                text("""update ihrms.arrear set status='paid', run_id=cast(:run as uuid)
+                        where employee_id=:emp and status='pending'"""),
+                {"emp": st["employee_id"], "run": run_id},
+            )
         if adv is not None and loan_recovery > 0:
             await session.execute(
                 text("""insert into ihrms.advance_recovery
@@ -614,6 +646,52 @@ async def set_statutory(
     )
     await session.commit()
     return StatutoryIdsOut(employee_id=employee_id, **payload.model_dump())
+
+
+# ---------------------------------------------------------------- arrears
+
+class ArrearOut(BaseModel):
+    id: str
+    employee_id: int
+    employee_name: str | None = None
+    amount: Decimal
+    months: int
+    reason: str | None = None
+    effective_from: date
+    status: str
+
+
+@router.get("/arrears", response_model=list[ArrearOut])
+async def list_arrears(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    employee_id: int | None = None,
+) -> list[ArrearOut]:
+    if principal.is_hr:
+        where, params = "", {}
+        if employee_id is not None:
+            where, params = "where a.employee_id = :e", {"e": employee_id}
+    else:
+        where, params = "where a.employee_id = :e", {"e": principal.employee_id}
+    rows = (
+        await session.execute(
+            text(f"""select a.id::text, a.employee_id, a.amount, a.months, a.reason,
+                       a.effective_from, a.status,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.arrear a
+                    left join public.employees e on e.employee_id = a.employee_id
+                    {where} order by a.created_at desc"""),
+            params,
+        )
+    ).mappings().all()
+    return [
+        ArrearOut(
+            id=r["id"], employee_id=r["employee_id"], employee_name=r["nm"] or None,
+            amount=r["amount"], months=r["months"], reason=r["reason"],
+            effective_from=r["effective_from"], status=r["status"],
+        )
+        for r in rows
+    ]
 
 
 # ---------------------------------------------------------------- return files

@@ -850,6 +850,20 @@ export function fetchStructure(employeeId: number): Promise<StructureSaved> {
   return apiGet<StructureSaved>(`/payroll/structures/${employeeId}`);
 }
 
+export interface Arrear {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  amount: string;
+  months: number;
+  reason: string | null;
+  effective_from: string;
+  status: "pending" | "paid" | "cancelled";
+}
+export function fetchArrears(employeeId?: number): Promise<Arrear[]> {
+  return apiGet<Arrear[]>(`/payroll/arrears${employeeId ? `?employee_id=${employeeId}` : ""}`);
+}
+
 export interface StatutoryIds {
   employee_id: number;
   uan: string | null;

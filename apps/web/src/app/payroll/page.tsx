@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   createRun,
   downloadFile,
+  fetchArrears,
   fetchEmployees,
   fetchRegister,
   fetchRuns,
@@ -11,6 +12,7 @@ import {
   markRunPaid,
   previewStructure,
   setStructure,
+  type Arrear,
   type EmployeeListItem,
   type PayrollRun,
   type Payslip,
@@ -202,8 +204,11 @@ export default function PayrollPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
+  const [arrears, setArrears] = useState<Arrear[]>([]);
+
   const reload = useCallback(() => {
     fetchRuns().then(setRuns).catch((e) => setError(e.message));
+    fetchArrears().then((a) => setArrears(a.filter((x) => x.status === "pending"))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -256,6 +261,29 @@ export default function PayrollPage() {
       )}
 
       <SalaryPanel employees={employees} />
+
+      {arrears.length > 0 && (
+        <section className="rounded-xl border border-warn-soft bg-warn-soft/30 p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-warn-strong">
+            Pending arrears <span className="font-normal text-mute">— paid in the next run</span>
+          </h2>
+          <div className="mt-2 space-y-1.5">
+            {arrears.map((a) => (
+              <div key={a.id} className="flex items-center justify-between text-sm">
+                <span className="text-ink">
+                  {a.employee_name ?? a.employee_id}
+                  <span className="ml-2 text-[11px] text-mute">
+                    {a.reason} · {a.months} month{a.months === 1 ? "" : "s"}
+                  </span>
+                </span>
+                <span className={`font-semibold ${Number(a.amount) < 0 ? "text-red-strong" : "text-ink"}`}>
+                  {inr(a.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="rounded-xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3">

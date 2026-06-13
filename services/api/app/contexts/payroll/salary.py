@@ -62,12 +62,15 @@ def compute_payslip(
     lop_days: Decimal = ZERO,
     declared_tds: Money = ZERO,
     loan_recovery: Money = ZERO,
+    arrears: Money = ZERO,
     rates: StatutoryRates = DEFAULT_RATES,
 ) -> Payslip:
     """Compute one month's payslip from a structure, with loss-of-pay
     proration. PF is on (prorated) basic; ESI/PT on prorated gross. Rates
     come from the tenant's active statutory pack (defaults to FY25-26).
-    `loan_recovery` (if any) is deducted as an advance/loan EMI."""
+    `loan_recovery` (if any) is deducted as an advance/loan EMI. `arrears`
+    (retro pay from a back-dated structure change) is added post-statutory —
+    the statutory for those months was already withheld then."""
     if lop_days < 0 or lop_days > working_days:
         raise ValueError("lop_days must be between 0 and working_days")
 
@@ -90,6 +93,11 @@ def compute_payslip(
         deductions["loan_recovery"] = loan_recovery
 
     total_deductions = sum(deductions.values(), D(0))
+
+    earnings: dict[str, Money] = {"basic": basic, "hra": hra, "special_allowance": special}
+    if arrears != 0:
+        earnings["arrears"] = arrears
+        gross = gross + arrears  # displayed gross includes retro pay
     net_pay = gross - total_deductions
 
     employer = {"pf_employer": pf.employer}
@@ -99,7 +107,7 @@ def compute_payslip(
     return Payslip(
         working_days=working_days,
         lop_days=lop_days,
-        earnings={"basic": basic, "hra": hra, "special_allowance": special},
+        earnings=earnings,
         deductions=deductions,
         employer_contributions=employer,
         gross=gross,
