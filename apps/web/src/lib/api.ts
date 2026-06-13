@@ -264,6 +264,38 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- reports
+
+export interface ReportMeta {
+  id: string;
+  name: string;
+  description: string;
+  columns: string[];
+}
+export interface ReportData {
+  id: string;
+  name: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+}
+export interface Insights {
+  headcount: number;
+  exits_total: number;
+  latest_monthly_net: string | null;
+  avg_tenure_months: number | null;
+  open_requisitions: number;
+}
+
+export function fetchReports(): Promise<ReportMeta[]> {
+  return apiGet<ReportMeta[]>("/reports");
+}
+export function fetchInsights(): Promise<Insights> {
+  return apiGet<Insights>("/reports/insights");
+}
+export function runReport(id: string): Promise<ReportData> {
+  return apiGet<ReportData>(`/reports/${id}`);
+}
+
 // ----------------------------------------------------------------- exit / F&F
 
 export interface ClearanceItem {
