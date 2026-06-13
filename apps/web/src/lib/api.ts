@@ -851,6 +851,33 @@ export function fetchWall(): Promise<Feedback[]> {
   return apiGet<Feedback[]>("/feedback/wall");
 }
 
+// ----------------------------------------------------------------- duty (OOD/WFH)
+
+export interface Duty {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  duty_type: "wfh" | "on_duty";
+  start_date: string;
+  end_date: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+}
+export function fetchDuty(scope: "mine" | "pending" = "mine"): Promise<Duty[]> {
+  return apiGet<Duty[]>(`/duty?scope=${scope}`);
+}
+export function requestDuty(body: {
+  duty_type: "wfh" | "on_duty";
+  start_date: string;
+  end_date: string;
+  reason: string;
+}): Promise<Duty> {
+  return apiPost<Duty>("/duty", body);
+}
+export function decideDuty(id: string, action: "approve" | "reject"): Promise<Duty> {
+  return apiPost<Duty>(`/duty/${id}/${action}`, {});
+}
+
 // ----------------------------------------------------------------- pip
 
 export interface PipCheckpoint {
@@ -1271,7 +1298,8 @@ export interface Task {
     | "increment"
     | "regularization"
     | "overtime"
-    | "comp_off";
+    | "comp_off"
+    | "duty";
   ref_id: string;
   employee_id: number;
   employee_name: string;

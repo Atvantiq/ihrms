@@ -27,7 +27,7 @@ class Task(BaseModel):
     """One actionable approval, normalised across modules."""
 
     task_type: Literal[
-        "leave", "timesheet", "increment", "regularization", "overtime", "comp_off"
+        "leave", "timesheet", "increment", "regularization", "overtime", "comp_off", "duty"
     ]
     ref_id: str
     employee_id: int
@@ -207,6 +207,37 @@ async def list_tasks(
                 title="Comp-off credit",
                 subtitle=f"Worked {r['earned_date']}",
                 badge="C-OFF",
+            )
+        )
+
+    # --- duty (OOD/WFH) approvals (HR: org; manager: reports) -------------
+    duty_where = "d.status = 'pending' and d.employee_id != :me"
+    if not is_hr:
+        duty_where += (
+            " and d.employee_id in (select employee_id from public.job_details"
+            " where reporting_manager = :me and is_active = 1)"
+        )
+    duty_rows = (
+        await session.execute(
+            text(f"""select d.id::text, d.employee_id, d.duty_type, d.start_date,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.duty_request d
+                    left join public.employees e on e.employee_id = d.employee_id
+                    where {duty_where}
+                    order by d.start_date"""),
+            {"me": me},
+        )
+    ).mappings().all()
+    for r in duty_rows:
+        tasks.append(
+            Task(
+                task_type="duty",
+                ref_id=r["id"],
+                employee_id=r["employee_id"],
+                employee_name=r["nm"] or "—",
+                title=f"{'WFH' if r['duty_type'] == 'wfh' else 'On-duty'} request",
+                subtitle=f"From {r['start_date']}",
+                badge="duty",
             )
         )
 

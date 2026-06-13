@@ -12,6 +12,7 @@ from app.contexts.consent.api import router as consent_router
 from app.contexts.control_plane.api import router as control_plane_router
 from app.contexts.core_hr.api import router as employees_router
 from app.contexts.dashboard.api import router as dashboard_router
+from app.contexts.duty.api import router as duty_router
 from app.contexts.exit_fnf.api import router as exit_router
 from app.contexts.feedback.api import router as feedback_router
 from app.contexts.identity.api import router as me_router
@@ -49,6 +50,7 @@ api_router.include_router(letters_router)
 api_router.include_router(bands_router)
 api_router.include_router(check_ins_router)
 api_router.include_router(pip_router)
+api_router.include_router(duty_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

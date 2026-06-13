@@ -6,19 +6,28 @@ import {
   earnCompOff,
   fetchAttendance,
   fetchCompOff,
+  fetchDuty,
   fetchEmployees,
   fetchMe,
   fetchOvertime,
   fetchRegularizations,
   logOvertime,
   markAttendance,
+  requestDuty,
   requestRegularization,
   type AttendanceSummary,
   type CompOff,
+  type Duty,
   type EmployeeListItem,
   type Overtime,
   type Regularization,
 } from "@/lib/api";
+
+const DUTY_STATUS_STYLE: Record<Duty["status"], string> = {
+  pending: "bg-warn-soft text-warn-strong",
+  approved: "bg-green-soft text-green-strong",
+  rejected: "bg-red-soft text-red-strong",
+};
 
 const CO_STATUS_STYLE: Record<CompOff["status"], string> = {
   pending: "bg-warn-soft text-warn-strong",
@@ -82,6 +91,7 @@ export default function AttendancePage() {
   const [regs, setRegs] = useState<Regularization[]>([]);
   const [ot, setOt] = useState<Overtime[]>([]);
   const [compOff, setCompOff] = useState<CompOff[]>([]);
+  const [duty, setDuty] = useState<Duty[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -105,7 +115,26 @@ export default function AttendancePage() {
     fetchRegularizations("mine").then(setRegs).catch(() => {});
     fetchOvertime("mine").then(setOt).catch(() => {});
     fetchCompOff("mine").then(setCompOff).catch(() => {});
+    fetchDuty("mine").then(setDuty).catch(() => {});
   }, []);
+
+  async function submitDuty(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await requestDuty({
+        duty_type: fd.get("duty_type") as "wfh" | "on_duty",
+        start_date: fd.get("start_date") as string,
+        end_date: fd.get("end_date") as string,
+        reason: fd.get("reason") as string,
+      });
+      form.reset();
+      loadRegs();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
   useEffect(loadRegs, [loadRegs]);
 
   async function submitCompOff(e: React.FormEvent<HTMLFormElement>) {
@@ -385,6 +414,39 @@ export default function AttendancePage() {
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${CO_STATUS_STYLE[c.status]}`}>
                       {c.status}
                     </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+              Work from home / on-duty
+              <span className="ml-2 font-normal text-mute">
+                request a date range — attendance is marked once approved
+              </span>
+            </div>
+            <form onSubmit={submitDuty} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+              <select name="duty_type" className="rounded-lg border border-line px-2 py-2 text-sm">
+                <option value="wfh">WFH</option>
+                <option value="on_duty">On-duty</option>
+              </select>
+              <input name="start_date" type="date" required className="rounded-lg border border-line px-2 py-2 text-sm text-mute" />
+              <input name="end_date" type="date" required className="rounded-lg border border-line px-2 py-2 text-sm text-mute" />
+              <input name="reason" required maxLength={300} placeholder="Reason" className="min-w-44 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+              <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Request</button>
+            </form>
+            <div className="divide-y divide-line-2">
+              {duty.length === 0 && <p className="px-4 py-3 text-sm text-mute">No WFH / on-duty requests.</p>}
+              {duty.map((d) => (
+                <div key={d.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-ink">
+                    {d.duty_type === "wfh" ? "WFH" : "On-duty"}
+                    <span className="ml-2 text-[11px] text-mute">{d.start_date} → {d.end_date} · {d.reason}</span>
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${DUTY_STATUS_STYLE[d.status]}`}>
+                    {d.status}
                   </span>
                 </div>
               ))}
