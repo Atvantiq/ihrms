@@ -259,3 +259,97 @@ export function fetchEmployees(params: {
 export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
+
+// ----------------------------------------------------------------- leave
+
+export interface LeaveType {
+  id: string;
+  key: string;
+  code: string;
+  label: string;
+  color: string;
+  description: string | null;
+  is_paid: boolean;
+  accrual_method: string;
+  annual_entitlement: string;
+  min_advance_notice_days: number;
+  max_consecutive_days: number | null;
+  half_day_allowed: boolean;
+  requires_doc: boolean;
+  show_in_ess: boolean;
+}
+
+export interface LeaveBalance {
+  leave_type_id: string;
+  code: string;
+  label: string;
+  color: string;
+  entitled: string;
+  accrued: string;
+  carried_forward: string;
+  used: string;
+  pending: string;
+  available: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  employee_id: number;
+  employee_name: string;
+  leave_type_id: string;
+  leave_code: string;
+  leave_label: string;
+  color: string;
+  start_date: string;
+  end_date: string;
+  half_day: boolean;
+  days: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  approver_id: number | null;
+  approver_name: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+  can_decide: boolean;
+  can_cancel: boolean;
+}
+
+export interface LeaveApply {
+  leave_type_id: string;
+  start_date: string;
+  end_date: string;
+  half_day?: boolean;
+  reason?: string | null;
+  employee_id?: number | null;
+}
+
+export function fetchLeaveTypes(): Promise<LeaveType[]> {
+  return apiGet<LeaveType[]>("/leave/types");
+}
+
+export function fetchLeaveBalances(employeeId?: number): Promise<LeaveBalance[]> {
+  return apiGet<LeaveBalance[]>(
+    `/leave/balances${employeeId ? `?employee_id=${employeeId}` : ""}`,
+  );
+}
+
+export function fetchLeaveRequests(
+  scope: "mine" | "pending" | "all" = "mine",
+): Promise<LeaveRequest[]> {
+  return apiGet<LeaveRequest[]>(`/leave/requests?scope=${scope}`);
+}
+
+export function applyLeave(payload: LeaveApply): Promise<LeaveRequest> {
+  return apiPost<LeaveRequest>("/leave/requests", payload);
+}
+
+export function decideLeave(
+  id: string,
+  action: "approve" | "reject" | "cancel",
+  note?: string,
+): Promise<LeaveRequest> {
+  return apiPost<LeaveRequest>(
+    `/leave/requests/${id}/${action}`,
+    action === "cancel" ? undefined : { note: note ?? null },
+  );
+}
