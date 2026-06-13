@@ -17,12 +17,14 @@ from app.contexts.performance.api import router as performance_router
 from app.contexts.pulse.api import router as pulse_router
 from app.contexts.recruitment.api import router as recruitment_router
 from app.contexts.reports.api import router as reports_router
+from app.contexts.tasks.api import router as tasks_router
 from app.contexts.timesheet.api import router as timesheet_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(pulse_router)
+api_router.include_router(tasks_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

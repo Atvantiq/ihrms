@@ -924,6 +924,22 @@ export function fetchPulseInbox(): Promise<PulseDecision[]> {
   return apiGet<PulseDecision[]>("/pulse/inbox");
 }
 
+export interface Task {
+  task_type: "leave" | "timesheet" | "increment";
+  ref_id: string;
+  employee_id: number;
+  employee_name: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  can_reject: boolean;
+  week_of: string | null;
+}
+
+export function fetchTasks(): Promise<Task[]> {
+  return apiGet<Task[]>("/tasks");
+}
+
 // ----------------------------------------------------------------- leave
 
 export interface LeaveType {

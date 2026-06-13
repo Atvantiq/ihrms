@@ -35,7 +35,7 @@ async def test_pending_leave_surfaces_as_decision(
     card = next((d for d in after if d["kind"] == "leave_approvals"), None)
     assert card is not None
     assert card["count"] == before + 1
-    assert card["action_href"] == "/leave"
+    assert card["action_href"] == "/tasks"  # approval cards route to the unified inbox
     assert card["severity"] in ("high", "medium", "low")
 
 

@@ -19,6 +19,7 @@ export const NAV: NavSection[] = [
     label: "Workspace",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "▦" },
+      { label: "Tasks", href: "/tasks", icon: "⊟" },
       { label: "Reports", href: "/reports", icon: "▤", hrOnly: true },
     ],
   },

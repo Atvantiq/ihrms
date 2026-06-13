@@ -59,7 +59,7 @@ async def inbox(
                 title=f"{leave_pending} leave request{'s' if leave_pending != 1 else ''} pending",
                 detail="Awaiting your approval decision.",
                 action_label="Review",
-                action_href="/leave",
+                action_href="/tasks",
                 count=leave_pending,
             )
         )
@@ -91,7 +91,7 @@ async def inbox(
                 title=f"{ts_pending} timesheet{'s' if ts_pending != 1 else ''} to approve",
                 detail="Submitted weeks awaiting your sign-off.",
                 action_label="Review",
-                action_href="/timesheet",
+                action_href="/tasks",
                 count=ts_pending,
             )
         )
@@ -111,7 +111,7 @@ async def inbox(
                     title=f"{incr} salary increment{'s' if incr != 1 else ''} proposed",
                     detail="Review and approve to push into payroll.",
                     action_label="Open",
-                    action_href="/performance",
+                    action_href="/tasks",
                     count=incr,
                 )
             )
