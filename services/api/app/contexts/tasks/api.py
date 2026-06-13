@@ -26,7 +26,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 class Task(BaseModel):
     """One actionable approval, normalised across modules."""
 
-    task_type: Literal["leave", "timesheet", "increment", "regularization"]
+    task_type: Literal["leave", "timesheet", "increment", "regularization", "overtime"]
     ref_id: str
     employee_id: int
     employee_name: str
@@ -143,6 +143,37 @@ async def list_tasks(
                 title=f"Regularize · {r['requested_status']}",
                 subtitle=f"For {r['work_date']}",
                 badge="att",
+            )
+        )
+
+    # --- overtime approvals (HR: org; manager: reports) -------------------
+    ot_where = "o.status = 'pending' and o.employee_id != :me"
+    if not is_hr:
+        ot_where += (
+            " and o.employee_id in (select employee_id from public.job_details"
+            " where reporting_manager = :me and is_active = 1)"
+        )
+    ot_rows = (
+        await session.execute(
+            text(f"""select o.id::text, o.employee_id, o.ot_date, o.hours,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.overtime o
+                    left join public.employees e on e.employee_id = o.employee_id
+                    where {ot_where}
+                    order by o.ot_date"""),
+            {"me": me},
+        )
+    ).mappings().all()
+    for r in ot_rows:
+        tasks.append(
+            Task(
+                task_type="overtime",
+                ref_id=r["id"],
+                employee_id=r["employee_id"],
+                employee_name=r["nm"] or "—",
+                title=f"Overtime · {float(r['hours']):g}h",
+                subtitle=f"On {r['ot_date']}",
+                badge="OT",
             )
         )
 

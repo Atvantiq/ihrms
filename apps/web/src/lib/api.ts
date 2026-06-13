@@ -850,6 +850,31 @@ export function decideRegularization(
   });
 }
 
+export interface Overtime {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  ot_date: string;
+  hours: string;
+  rate_multiplier: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected" | "paid";
+}
+export function fetchOvertime(scope: "mine" | "pending" = "mine"): Promise<Overtime[]> {
+  return apiGet<Overtime[]>(`/overtime?scope=${scope}`);
+}
+export function logOvertime(body: {
+  ot_date: string;
+  hours: string;
+  rate_multiplier?: string;
+  reason: string;
+}): Promise<Overtime> {
+  return apiPost<Overtime>("/overtime", body);
+}
+export function decideOvertime(id: string, action: "approve" | "reject"): Promise<Overtime> {
+  return apiPost<Overtime>(`/overtime/${id}/${action}`, {});
+}
+
 // ----------------------------------------------------------------- payroll
 
 export interface StructurePreview {
@@ -1060,7 +1085,7 @@ export function fetchPulseInbox(): Promise<PulseDecision[]> {
 }
 
 export interface Task {
-  task_type: "leave" | "timesheet" | "increment" | "regularization";
+  task_type: "leave" | "timesheet" | "increment" | "regularization" | "overtime";
   ref_id: string;
   employee_id: number;
   employee_name: string;

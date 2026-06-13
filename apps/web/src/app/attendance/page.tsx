@@ -5,11 +5,14 @@ import {
   fetchAttendance,
   fetchEmployees,
   fetchMe,
+  fetchOvertime,
   fetchRegularizations,
+  logOvertime,
   markAttendance,
   requestRegularization,
   type AttendanceSummary,
   type EmployeeListItem,
+  type Overtime,
   type Regularization,
 } from "@/lib/api";
 
@@ -17,6 +20,13 @@ const REG_STATUS_STYLE: Record<Regularization["status"], string> = {
   pending: "bg-warn-soft text-warn-strong",
   approved: "bg-green-soft text-green-strong",
   rejected: "bg-red-soft text-red-strong",
+};
+
+const OT_STATUS_STYLE: Record<Overtime["status"], string> = {
+  pending: "bg-warn-soft text-warn-strong",
+  approved: "bg-green-soft text-green-strong",
+  rejected: "bg-red-soft text-red-strong",
+  paid: "bg-blue-soft text-blue-strong",
 };
 
 const MONTHS = [
@@ -58,6 +68,7 @@ export default function AttendancePage() {
   const [empId, setEmpId] = useState<number | null>(null);
   const [data, setData] = useState<AttendanceSummary | null>(null);
   const [regs, setRegs] = useState<Regularization[]>([]);
+  const [ot, setOt] = useState<Overtime[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,8 +90,26 @@ export default function AttendancePage() {
 
   const loadRegs = useCallback(() => {
     fetchRegularizations("mine").then(setRegs).catch(() => {});
+    fetchOvertime("mine").then(setOt).catch(() => {});
   }, []);
   useEffect(loadRegs, [loadRegs]);
+
+  async function submitOt(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await logOvertime({
+        ot_date: fd.get("ot_date") as string,
+        hours: fd.get("hours") as string,
+        reason: fd.get("reason") as string,
+      });
+      form.reset();
+      loadRegs();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   async function submitReg(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -240,6 +269,39 @@ export default function AttendancePage() {
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${REG_STATUS_STYLE[r.status]}`}>
                     {r.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+              Overtime
+              <span className="ml-2 font-normal text-mute">
+                log extra hours — paid (hours × rate) once approved
+              </span>
+            </div>
+            <form onSubmit={submitOt} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+              <input name="ot_date" type="date" required className="rounded-lg border border-line px-2 py-2 text-sm text-mute" />
+              <input name="hours" type="number" min="0.5" max="24" step="0.5" required placeholder="Hours" className="w-24 rounded-lg border border-line px-3 py-2 text-sm" />
+              <input name="reason" required maxLength={300} placeholder="Reason" className="min-w-48 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+              <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Log OT</button>
+            </form>
+            <div className="divide-y divide-line-2">
+              {ot.length === 0 && (
+                <p className="px-4 py-3 text-sm text-mute">No overtime logged.</p>
+              )}
+              {ot.map((o) => (
+                <div key={o.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-ink">
+                    {o.ot_date}
+                    <span className="ml-2 text-[11px] text-mute">
+                      {Number(o.hours)}h · {Number(o.rate_multiplier)}× · {o.reason}
+                    </span>
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${OT_STATUS_STYLE[o.status]}`}>
+                    {o.status}
                   </span>
                 </div>
               ))}

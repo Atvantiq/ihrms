@@ -63,6 +63,7 @@ def compute_payslip(
     declared_tds: Money = ZERO,
     loan_recovery: Money = ZERO,
     arrears: Money = ZERO,
+    overtime: Money = ZERO,
     rates: StatutoryRates = DEFAULT_RATES,
 ) -> Payslip:
     """Compute one month's payslip from a structure, with loss-of-pay
@@ -98,6 +99,9 @@ def compute_payslip(
     if arrears != 0:
         earnings["arrears"] = arrears
         gross = gross + arrears  # displayed gross includes retro pay
+    if overtime > 0:
+        earnings["overtime"] = overtime
+        gross = gross + overtime  # OT is a post-statutory addition
     net_pay = gross - total_deductions
 
     employer = {"pf_employer": pf.employer}

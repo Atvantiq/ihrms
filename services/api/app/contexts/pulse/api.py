@@ -129,6 +129,37 @@ async def inbox(
             )
         )
 
+    # 2c) Overtime approvals waiting on me.
+    if is_hr:
+        ot_pending = await _scalar(
+            session,
+            "select count(*) from ihrms.overtime where status='pending' and employee_id != :me",
+            me=me,
+        )
+    else:
+        ot_pending = await _scalar(
+            session,
+            """select count(*) from ihrms.overtime o
+               where o.status='pending' and o.employee_id != :me
+                 and o.employee_id in (
+                   select employee_id from public.job_details
+                   where reporting_manager = :me and is_active = 1)""",
+            me=me,
+        )
+    if ot_pending:
+        decisions.append(
+            Decision(
+                kind="overtime_approvals",
+                severity=severity_for_count(ot_pending, high_at=8),
+                icon="⏱",
+                title=f"{ot_pending} overtime claim{'s' if ot_pending != 1 else ''} to review",
+                detail="Overtime awaiting your approval.",
+                action_label="Review",
+                action_href="/tasks",
+                count=ot_pending,
+            )
+        )
+
     # The remaining signals are HR/platform decisions.
     if is_hr:
         # 3) Increment proposals awaiting approval.

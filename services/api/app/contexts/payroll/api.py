@@ -20,6 +20,8 @@ from app.contexts.identity.principal import (
     get_current_principal,
     require_roles,
 )
+from app.contexts.overtime.service import hourly_rate as ot_hourly_rate
+from app.contexts.overtime.service import ot_pay
 from app.contexts.payroll.arrears import arrear_amount, retro_months
 from app.contexts.payroll.outputs import gl_journal, statutory_totals
 from app.contexts.payroll.pdf import payslip_pdf
@@ -340,11 +342,30 @@ async def create_run(
         ).scalar()
         arrears = D(str(arrears or 0))
 
+        # pay approved-but-unpaid overtime: hours x multiplier x hourly rate
+        rate_per_hour = ot_hourly_rate(s.gross, payload.working_days)
+        ot_rows = (
+            await session.execute(
+                text("""select id::text, hours, rate_multiplier from ihrms.overtime
+                        where employee_id = :emp and status = 'approved'"""),
+                {"emp": st["employee_id"]},
+            )
+        ).mappings().all()
+        overtime_pay = sum(
+            (ot_pay(o["hours"], o["rate_multiplier"], rate_per_hour) for o in ot_rows), D(0)
+        )
+
         slip = compute_payslip(
             s, working_days=payload.working_days,
             lop_days=D(att.absent), declared_tds=tds, loan_recovery=loan_recovery,
-            arrears=arrears, rates=rates,
+            arrears=arrears, overtime=overtime_pay, rates=rates,
         )
+        if ot_rows:
+            await session.execute(
+                text("""update ihrms.overtime set status='paid', run_id=cast(:run as uuid)
+                        where employee_id=:emp and status='approved'"""),
+                {"emp": st["employee_id"], "run": run_id},
+            )
         if arrears != 0:
             await session.execute(
                 text("""update ihrms.arrear set status='paid', run_id=cast(:run as uuid)
