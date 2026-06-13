@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contexts.advances.service import emi_for_month
 from app.contexts.attendance.repo import month_summary
+from app.contexts.history.recorder import record_changes
 from app.contexts.identity.principal import (
     ROLE_HR_ADMIN,
     Principal,
@@ -127,6 +128,13 @@ async def set_structure(
     else:
         s = derive_structure(payload.ctc_annual)
 
+    prev_ctc = (
+        await session.execute(
+            text("""select ctc_annual from ihrms.salary_structure
+                    where employee_id = :emp and is_active"""),
+            {"emp": employee_id},
+        )
+    ).scalar()
     await session.execute(
         text("""update ihrms.salary_structure set is_active = false
                 where employee_id = :emp and is_active"""),
@@ -145,6 +153,11 @@ async def set_structure(
         session, principal, "salary.set", "employee", str(employee_id),
         summary=f"Set CTC ₹{s.ctc_annual} ({payload.tax_regime} regime)",
         changes={"ctc_annual": str(s.ctc_annual), "tax_regime": payload.tax_regime},
+    )
+    await record_changes(
+        session, employee_id=employee_id, category="compensation",
+        changes=[("ctc_annual", prev_ctc, s.ctc_annual)],
+        changed_by=principal.employee_id, effective_date=payload.effective_from,
     )
     tds = monthly_tds(
         s.gross, regime=payload.tax_regime,

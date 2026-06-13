@@ -14,7 +14,28 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contexts.history.recorder import record_changes
 from app.core.validators import validate_aadhaar, validate_pan
+
+# Fields whose changes are logged to the employee timeline, mapped to
+# (category, the canonical v_employee column that holds the old value).
+# PII identifiers (pan/aadhaar) are deliberately excluded from the history log.
+_HISTORY_FIELDS: dict[str, tuple[str, str]] = {
+    "designation": ("job", "designation_c"),
+    "department": ("job", "department_c"),
+    "division": ("job", "division_c"),
+    "branch": ("job", "branch_c"),
+    "reporting_manager_id": ("job", "reporting_manager_id"),
+    "date_of_joining": ("job", "date_of_joining"),
+    "date_of_leaving": ("job", "date_of_leaving"),
+    "first_name": ("personal", "first_name"),
+    "middle_name": ("personal", "middle_name"),
+    "last_name": ("personal", "last_name"),
+    "phone": ("personal", "phone"),
+    "gender": ("personal", "gender"),
+    "date_of_birth": ("personal", "date_of_birth"),
+    "marital_status": ("personal", "marital_status"),
+}
 
 
 class EmployeeUpdate(BaseModel):
@@ -70,7 +91,10 @@ _DB_NAMES = {"aadhaar_no": "adhar_no", "reporting_manager_id": "reporting_manage
 
 
 async def update_employee(
-    session: AsyncSession, employee_id: int, payload: EmployeeUpdate
+    session: AsyncSession,
+    employee_id: int,
+    payload: EmployeeUpdate,
+    changed_by: int | None = None,
 ) -> None:
     exists = (
         await session.execute(
@@ -82,6 +106,19 @@ async def update_employee(
         raise LookupError("Employee not found")
 
     fields: dict[str, Any] = payload.model_dump(exclude_unset=True)
+
+    # snapshot old values for any tracked field being changed, before we write
+    tracked = [f for f in fields if f in _HISTORY_FIELDS]
+    old_values: dict[str, Any] = {}
+    if tracked:
+        snap_cols = ", ".join(f"{_HISTORY_FIELDS[f][1]} as {f}" for f in tracked)
+        row = (
+            await session.execute(
+                text(f"select {snap_cols} from ihrms.v_employee where employee_id = :id"),
+                {"id": employee_id},
+            )
+        ).mappings().first()
+        old_values = dict(row) if row else {}
 
     if "reporting_manager_id" in fields and fields["reporting_manager_id"] is not None:
         if fields["reporting_manager_id"] == employee_id:
@@ -142,5 +179,18 @@ async def update_employee(
                          (employee_id, {", ".join(cols)})
                          values (:employee_id, {", ".join(placeholders)})"""),
                 {**detail_params, "employee_id": employee_id},
+            )
+
+    # log the effective-dated changes to the employee timeline
+    for category in ("job", "personal"):
+        triples = [
+            (f, old_values.get(f), fields[f])
+            for f in tracked
+            if _HISTORY_FIELDS[f][0] == category
+        ]
+        if triples:
+            await record_changes(
+                session, employee_id=employee_id, category=category,
+                changes=triples, changed_by=changed_by,
             )
 

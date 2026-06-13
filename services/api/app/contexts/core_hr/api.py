@@ -1,7 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contexts.core_hr.create import (
@@ -127,7 +129,7 @@ async def edit_employee(
     principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
 ) -> EmployeeDetail:
     try:
-        await update_employee(session, employee_id, payload)
+        await update_employee(session, employee_id, payload, principal.employee_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
@@ -181,3 +183,34 @@ async def get_employee(
                 pii_visible=pii_visible,
             )
     raise HTTPException(404, "Employee not found")
+
+
+class HistoryEntry(BaseModel):
+    category: str
+    field: str
+    old_value: str | None = None
+    new_value: str | None = None
+    effective_date: date
+    changed_by: int | None = None
+    created_at: datetime
+
+
+@router.get("/{employee_id}/history", response_model=list[HistoryEntry])
+async def employee_history(
+    employee_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> list[HistoryEntry]:
+    """Effective-dated change timeline — self or HR (sensitive: comp + job moves)."""
+    if employee_id != principal.employee_id and not principal.is_hr:
+        raise HTTPException(403, "You can only view your own history")
+    rows = (
+        await session.execute(
+            text("""select category, field, old_value, new_value, effective_date,
+                       changed_by, created_at
+                    from ihrms.employee_history
+                    where employee_id = :e order by created_at desc limit 100"""),
+            {"e": employee_id},
+        )
+    ).mappings().all()
+    return [HistoryEntry(**dict(r)) for r in rows]

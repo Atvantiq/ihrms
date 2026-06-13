@@ -7,6 +7,7 @@ import {
   fetchEmployee,
   fetchEmployeeAdvances,
   fetchEmployeeAssets,
+  fetchEmployeeHistory,
   fetchEmployeePayslips,
   fetchLeaveBalances,
   fetchMe,
@@ -15,10 +16,21 @@ import {
   type Asset,
   type ConsentLine,
   type EmployeeDetail,
+  type HistoryEntry,
   type LeaveBalance,
   type Payslip,
   type StructureSaved,
 } from "@/lib/api";
+
+const HISTORY_DOT: Record<HistoryEntry["category"], string> = {
+  job: "bg-indigo",
+  personal: "bg-blue-strong",
+  compensation: "bg-green",
+};
+
+function labelField(f: string): string {
+  return f.replace(/_/g, " ").replace(/\bid\b/, "").trim();
+}
 
 const CONSENT_DOT: Record<ConsentLine["status"], string> = {
   granted: "bg-green",
@@ -73,6 +85,7 @@ export default function ProfilePage({
   const [assets, setAssets] = useState<Asset[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [consent, setConsent] = useState<ConsentLine[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -87,6 +100,7 @@ export default function ProfilePage({
           fetchEmployeeAssets(empIdNum).then(setAssets).catch(() => {});
           fetchEmployeeAdvances(empIdNum).then(setAdvances).catch(() => {});
           fetchConsent(empIdNum).then(setConsent).catch(() => {});
+          fetchEmployeeHistory(empIdNum).then(setHistory).catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
@@ -307,6 +321,31 @@ export default function ProfilePage({
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {emp.pii_visible && history.length > 0 && (
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold text-ink">Change history</h2>
+          <ol className="space-y-3">
+            {history.map((h, i) => (
+              <li key={i} className="flex gap-3">
+                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${HISTORY_DOT[h.category]}`} />
+                <div className="flex-1 text-sm">
+                  <div className="text-ink">
+                    <span className="capitalize">{labelField(h.field)}</span>
+                    {h.old_value && (
+                      <span className="text-mute"> · {h.old_value} →</span>
+                    )}{" "}
+                    <span className="font-medium">{h.new_value ?? "—"}</span>
+                  </div>
+                  <div className="text-[10px] text-mute-2">
+                    {h.effective_date} · {h.category}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
       )}
     </div>

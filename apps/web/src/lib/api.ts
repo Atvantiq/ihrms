@@ -261,6 +261,20 @@ export function fetchEmployees(params: {
   return apiGet<EmployeeListOut>(`/employees${suffix}`);
 }
 
+export interface HistoryEntry {
+  category: "job" | "personal" | "compensation";
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  effective_date: string;
+  changed_by: number | null;
+  created_at: string;
+}
+
+export function fetchEmployeeHistory(employeeId: number): Promise<HistoryEntry[]> {
+  return apiGet<HistoryEntry[]>(`/employees/${employeeId}/history`);
+}
+
 export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
