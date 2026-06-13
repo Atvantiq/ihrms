@@ -1069,6 +1069,52 @@ export function fetchCareerLadder(employeeId: number): Promise<CareerLadder> {
   return apiGet<CareerLadder>(`/career/employees/${employeeId}/ladder`);
 }
 
+// ---- succession planning
+
+export interface SuccessionCandidate {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  readiness: "ready_now" | "1_2_years" | "3_5_years";
+  note: string | null;
+}
+export interface KeyPosition {
+  id: string;
+  title: string;
+  incumbent_id: number | null;
+  incumbent_name: string | null;
+  risk_level: "low" | "medium" | "high";
+  notes: string | null;
+  candidates: SuccessionCandidate[];
+  bench_status: "covered" | "developing" | "at_risk";
+  ready_now: number;
+}
+export function fetchKeyPositions(): Promise<KeyPosition[]> {
+  return apiGet<KeyPosition[]>("/succession/positions");
+}
+export function createKeyPosition(body: {
+  title: string;
+  incumbent_id?: number | null;
+  risk_level: "low" | "medium" | "high";
+  notes?: string | null;
+}): Promise<KeyPosition> {
+  return apiPost<KeyPosition>("/succession/positions", body);
+}
+export function addSuccessor(positionId: string, body: {
+  employee_id: number;
+  readiness: "ready_now" | "1_2_years" | "3_5_years";
+  note?: string | null;
+}): Promise<KeyPosition> {
+  return apiPost<KeyPosition>(`/succession/positions/${positionId}/candidates`, body);
+}
+export async function removeSuccessor(positionId: string, candidateId: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/succession/positions/${positionId}/candidates/${candidateId}`,
+    { method: "DELETE", headers: { ...(await authHeader()) } },
+  );
+  if (!res.ok && res.status !== 204) throw new Error(`Delete failed (${res.status})`);
+}
+
 // ----------------------------------------------------------------- timesheet
 
 export interface Project {

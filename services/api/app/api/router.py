@@ -37,6 +37,7 @@ from app.contexts.recruitment.api import router as recruitment_router
 from app.contexts.reports.api import router as reports_router
 from app.contexts.salary_config.api import router as salary_config_router
 from app.contexts.shifts.api import router as shifts_router
+from app.contexts.succession.api import router as succession_router
 from app.contexts.tasks.api import router as tasks_router
 from app.contexts.tax.api import router as tax_router
 from app.contexts.timesheet.api import router as timesheet_router
@@ -63,6 +64,7 @@ api_router.include_router(career_router)
 api_router.include_router(check_ins_router)
 api_router.include_router(claims_router)
 api_router.include_router(pip_router)
+api_router.include_router(succession_router)
 api_router.include_router(duty_router)
 api_router.include_router(helpdesk_router)
 api_router.include_router(policies_router)
