@@ -851,6 +851,33 @@ export function fetchWall(): Promise<Feedback[]> {
   return apiGet<Feedback[]>("/feedback/wall");
 }
 
+// ----------------------------------------------------------------- check-ins
+
+export interface CheckIn {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  check_in_date: string;
+  highlights: string;
+  challenges: string | null;
+  mood: number;
+  mood_label: string;
+  created_at: string;
+}
+export function logCheckIn(body: {
+  highlights: string;
+  challenges?: string | null;
+  mood: number;
+}): Promise<CheckIn> {
+  return apiPost<CheckIn>("/check-ins", body);
+}
+export function fetchMyCheckIns(): Promise<CheckIn[]> {
+  return apiGet<CheckIn[]>("/check-ins/mine");
+}
+export function fetchTeamCheckIns(): Promise<CheckIn[]> {
+  return apiGet<CheckIn[]>("/check-ins/team");
+}
+
 // ----------------------------------------------------------------- shifts
 
 export interface Shift {

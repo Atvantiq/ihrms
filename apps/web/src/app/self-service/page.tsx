@@ -11,7 +11,10 @@ import {
   fetchLeaveBalances,
   fetchLeaveRequests,
   fetchMe,
+  fetchMyCheckIns,
+  logCheckIn,
   type AttendanceSummary,
+  type CheckIn,
   type ConsentLine,
   type EmployeeDetail,
   type LeaveBalance,
@@ -74,6 +77,7 @@ export default function SelfServicePage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
   const [consent, setConsent] = useState<ConsentLine[]>([]);
+  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function SelfServicePage() {
       })
       .catch((e: Error) => setError(e.message));
     fetchConsent().then(setConsent).catch(() => {});
+    fetchMyCheckIns().then(setCheckIns).catch(() => {});
   }, []);
 
   async function toggleConsent(purpose: string, grant: boolean) {
@@ -98,6 +103,22 @@ export default function SelfServicePage() {
       setConsent(await decideConsent(purpose, grant));
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+  async function submitCheckIn(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await logCheckIn({
+        highlights: fd.get("highlights") as string,
+        challenges: (fd.get("challenges") as string) || null,
+        mood: Number(fd.get("mood")),
+      });
+      form.reset();
+      fetchMyCheckIns().then(setCheckIns).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
@@ -247,6 +268,37 @@ export default function SelfServicePage() {
           </div>
         </Panel>
       </div>
+
+      <section className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">Check-in</h2>
+          <p className="text-[11px] text-mute">A quick note for your manager — what went well, what&apos;s hard, how you feel.</p>
+        </div>
+        <form onSubmit={submitCheckIn} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+          <input name="highlights" required maxLength={1000} placeholder="Highlights" className="min-w-44 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <input name="challenges" maxLength={1000} placeholder="Challenges (optional)" className="min-w-44 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <select name="mood" defaultValue="4" className="rounded-lg border border-line px-2 py-2 text-sm">
+            <option value="1">😟 Struggling</option>
+            <option value="2">🙁 Low</option>
+            <option value="3">😐 Okay</option>
+            <option value="4">🙂 Good</option>
+            <option value="5">😄 Great</option>
+          </select>
+          <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Check in</button>
+        </form>
+        <div className="divide-y divide-line-2">
+          {checkIns.length === 0 && <p className="px-4 py-3 text-sm text-mute">No check-ins yet.</p>}
+          {checkIns.slice(0, 5).map((c) => (
+            <div key={c.id} className="px-4 py-2.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-ink">{c.highlights}</span>
+                <span className="ml-2 text-[11px] capitalize text-mute">{c.mood_label} · {c.check_in_date}</span>
+              </div>
+              {c.challenges && <div className="text-[11px] text-mute">⚠ {c.challenges}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
 
       {consent.length > 0 && (
         <section className="rounded-xl border border-line bg-surface shadow-sm">
