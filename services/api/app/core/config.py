@@ -23,6 +23,9 @@ class Settings(BaseSettings):
 
     # DEV ONLY — lets endpoints run before Supabase keys are wired
     auth_disabled: bool = False
+    # DEV ONLY — enables POST /auth/dev-login (password-free HR sign-in).
+    # MUST stay false in any non-dev environment.
+    dev_login_enabled: bool = False
 
     # Comma-separated origins for the web app
     cors_origins: str = "http://localhost:3000"

@@ -11,6 +11,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const devLoginEnabled = process.env.NEXT_PUBLIC_DEV_LOGIN === "true";
+
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -25,6 +27,27 @@ export default function LoginPage() {
       return;
     }
     router.push("/directory");
+  }
+
+  async function devSignIn() {
+    setBusy(true);
+    setError(null);
+    try {
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+      const res = await fetch(`${apiBase}/auth/dev-login`, { method: "POST" });
+      if (!res.ok) throw new Error(`Dev login unavailable (${res.status})`);
+      const s = await res.json();
+      const { error } = await supabase().auth.setSession({
+        access_token: s.access_token,
+        refresh_token: s.refresh_token,
+      });
+      if (error) throw error;
+      router.push("/directory");
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
   }
 
   return (
@@ -80,6 +103,22 @@ export default function LoginPage() {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        {devLoginEnabled && (
+          <>
+            <div className="my-4 flex items-center gap-2 text-[10px] uppercase tracking-wider text-mute-2">
+              <span className="h-px flex-1 bg-line" /> or{" "}
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <button
+              onClick={devSignIn}
+              disabled={busy}
+              className="w-full rounded-lg border border-dashed border-indigo bg-indigo-soft py-2 text-sm font-medium text-indigo-strong hover:opacity-80 disabled:opacity-50"
+            >
+              ⚡ Dev sign-in as HR (localhost)
+            </button>
+          </>
+        )}
 
         <p className="mt-4 text-center text-[11px] text-mute-2">
           Same login as ONAQT · contact your administrator for access
