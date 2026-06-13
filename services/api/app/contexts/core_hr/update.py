@@ -10,9 +10,11 @@
 from datetime import date
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.validators import validate_aadhaar, validate_pan
 
 
 class EmployeeUpdate(BaseModel):
@@ -41,6 +43,17 @@ class EmployeeUpdate(BaseModel):
     alternate_phone: str | None = None
     pan_no: str | None = None
     aadhaar_no: str | None = None
+
+    @field_validator("pan_no")
+    @classmethod
+    def _pan(cls, v: str | None) -> str | None:
+        # blank clears the field; otherwise validate + normalise
+        return None if not (v and v.strip()) else validate_pan(v)
+
+    @field_validator("aadhaar_no")
+    @classmethod
+    def _aadhaar(cls, v: str | None) -> str | None:
+        return None if not (v and v.strip()) else validate_aadhaar(v)
 
 
 _EMPLOYEE_COLS = ("first_name", "middle_name", "last_name", "phone", "gender", "date_of_birth")

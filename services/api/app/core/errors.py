@@ -35,7 +35,15 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exc(_: Request, exc: RequestValidationError) -> JSONResponse:
-        return _envelope(exc.errors(), 422)
+        # Pydantic puts the raw exception in `ctx.error` when a custom field
+        # validator raises ValueError; that object is not JSON-serialisable, so
+        # stringify every ctx value before it reaches the response encoder.
+        errors = exc.errors()
+        for err in errors:
+            ctx = err.get("ctx")
+            if ctx:
+                err["ctx"] = {k: str(v) for k, v in ctx.items()}
+        return _envelope(errors, 422)
 
     @app.exception_handler(Exception)
     async def unhandled_exc(request: Request, exc: Exception) -> JSONResponse:

@@ -76,13 +76,13 @@ async def test_pii_redaction(
     await client.patch(
         f"/api/v1/employees/{100000000002}",
         headers=hr_headers,
-        json={"pan_no": "ABCDE1234F"},
+        json={"pan_no": "ABCPE1234F"},
     )
     # HR sees it
     hr_view = (
         await client.get("/api/v1/employees/100000000002", headers=hr_headers)
     ).json()
-    assert hr_view["pan_no"] == "ABCDE1234F"
+    assert hr_view["pan_no"] == "ABCPE1234F"
     assert hr_view["pii_visible"] is True
     # the other employee does not
     other = (
@@ -169,6 +169,25 @@ async def test_leave_excludes_holiday(
     )
     assert r.status_code == 201, r.text
     assert float(r.json()["days"]) == 4.0
+
+
+async def test_pan_is_validated_and_normalised(
+    client: AsyncClient, hr_headers: dict[str, str]
+) -> None:
+    # a malformed PAN is rejected at the boundary
+    bad = await client.patch(
+        "/api/v1/employees/100000000002", headers=hr_headers, json={"pan_no": "NOTAPAN"}
+    )
+    assert bad.status_code == 422
+    # a valid lowercase PAN is accepted and stored upper-cased
+    ok = await client.patch(
+        "/api/v1/employees/100000000002", headers=hr_headers, json={"pan_no": " abcpe1234f "}
+    )
+    assert ok.status_code in (200, 204), ok.text
+    view = (
+        await client.get("/api/v1/employees/100000000002", headers=hr_headers)
+    ).json()
+    assert view["pan_no"] == "ABCPE1234F"
 
 
 async def test_writes_are_audited(

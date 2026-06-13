@@ -67,6 +67,25 @@ async function authHeader(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Turn an error response into a human-readable message. Handles the API's
+ *  envelope where `detail` is either a string (HTTPException) or a list of
+ *  Pydantic field errors (422). For field errors we surface "field: message". */
+async function errorMessage(res: Response): Promise<string> {
+  const raw = await res.text();
+  let detail: unknown = raw;
+  try {
+    detail = JSON.parse(raw).detail ?? raw;
+  } catch {}
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const e = detail[0] as { loc?: unknown[]; msg?: string };
+    const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : undefined;
+    const msg = (e.msg ?? "Invalid value").replace(/^Value error,\s*/, "");
+    return field && field !== "body" ? `${field}: ${msg}` : msg;
+  }
+  return `Request failed (${res.status})`;
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Accept: "application/json", ...(await authHeader()) },
@@ -76,7 +95,7 @@ async function apiGet<T>(path: string): Promise<T> {
     window.location.href = "/login";
     throw new Error("Not signed in");
   }
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<T>;
 }
 
@@ -128,13 +147,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
     window.location.href = "/login";
     throw new Error("Not signed in");
   }
-  if (!res.ok) {
-    let detail = await res.text();
-    try {
-      detail = JSON.parse(detail).detail ?? detail;
-    } catch {}
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-  }
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<T>;
 }
 
@@ -191,13 +204,7 @@ export async function updateEmployee(
     window.location.href = "/login";
     throw new Error("Not signed in");
   }
-  if (!res.ok) {
-    let detail = await res.text();
-    try {
-      detail = JSON.parse(detail).detail ?? detail;
-    } catch {}
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-  }
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<EmployeeDetail>;
 }
 
@@ -229,13 +236,7 @@ export async function renameOrgMaster(id: string, name: string): Promise<OrgMast
     },
     body: JSON.stringify({ name }),
   });
-  if (!res.ok) {
-    let detail = await res.text();
-    try {
-      detail = JSON.parse(detail).detail ?? detail;
-    } catch {}
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-  }
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<OrgMaster>;
 }
 
@@ -568,13 +569,7 @@ async function apiPatch<T>(path: string, body: unknown): Promise<T> {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    let d = await res.text();
-    try {
-      d = JSON.parse(d).detail ?? d;
-    } catch {}
-    throw new Error(typeof d === "string" ? d : JSON.stringify(d));
-  }
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<T>;
 }
 
@@ -885,13 +880,7 @@ async function apiPut<T>(path: string, body: unknown): Promise<T> {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    let detail = await res.text();
-    try {
-      detail = JSON.parse(detail).detail ?? detail;
-    } catch {}
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-  }
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<T>;
 }
 

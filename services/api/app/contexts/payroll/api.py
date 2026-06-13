@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +26,7 @@ from app.contexts.payroll.tds import monthly_tds
 from app.core.audit import record_audit
 from app.core.db import get_session
 from app.core.money import D
+from app.core.validators import validate_ifsc
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -577,6 +578,19 @@ class BankIn(BaseModel):
     account_number: str = Field(min_length=4, max_length=30)
     ifsc: str = Field(min_length=4, max_length=15)
     bank_name: str | None = None
+
+    @field_validator("account_number")
+    @classmethod
+    def _account(cls, v: str) -> str:
+        acc = v.strip()
+        if not acc.isdigit():
+            raise ValueError("Account number must be digits only")
+        return acc
+
+    @field_validator("ifsc")
+    @classmethod
+    def _ifsc(cls, v: str) -> str:
+        return validate_ifsc(v)
 
 
 @router.put("/bank/{employee_id}", status_code=204)
