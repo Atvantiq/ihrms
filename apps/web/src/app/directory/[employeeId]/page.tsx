@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  fetchConsent,
   fetchEmployee,
   fetchEmployeeAdvances,
   fetchEmployeeAssets,
@@ -12,11 +13,18 @@ import {
   fetchStructure,
   type Advance,
   type Asset,
+  type ConsentLine,
   type EmployeeDetail,
   type LeaveBalance,
   type Payslip,
   type StructureSaved,
 } from "@/lib/api";
+
+const CONSENT_DOT: Record<ConsentLine["status"], string> = {
+  granted: "bg-green",
+  withdrawn: "bg-red",
+  not_given: "bg-line",
+};
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 
@@ -64,6 +72,7 @@ export default function ProfilePage({
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
+  const [consent, setConsent] = useState<ConsentLine[]>([]);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -77,6 +86,7 @@ export default function ProfilePage({
           fetchEmployeePayslips(empIdNum).then(setPayslips).catch(() => {});
           fetchEmployeeAssets(empIdNum).then(setAssets).catch(() => {});
           fetchEmployeeAdvances(empIdNum).then(setAdvances).catch(() => {});
+          fetchConsent(empIdNum).then(setConsent).catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
@@ -275,6 +285,27 @@ export default function ProfilePage({
                   </span>
                 </div>
               ))}
+          </div>
+        </section>
+      )}
+
+      {emp.pii_visible && consent.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <h2 className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">
+            Data &amp; privacy consent
+          </h2>
+          <div className="divide-y divide-line-2">
+            {consent.map((c) => (
+              <div key={c.purpose} className="flex items-center justify-between px-5 py-2.5 text-sm">
+                <span className="flex items-center gap-2 text-ink">
+                  <span className={`h-2 w-2 rounded-full ${CONSENT_DOT[c.status]}`} />
+                  {c.label}
+                </span>
+                <span className="text-[11px] capitalize text-mute">
+                  {c.status.replace("_", " ")}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       )}

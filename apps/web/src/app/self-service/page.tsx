@@ -3,18 +3,27 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  decideConsent,
   fetchAttendance,
+  fetchConsent,
   fetchEmployee,
   fetchEmployeePayslips,
   fetchLeaveBalances,
   fetchLeaveRequests,
   fetchMe,
   type AttendanceSummary,
+  type ConsentLine,
   type EmployeeDetail,
   type LeaveBalance,
   type LeaveRequest,
   type Payslip,
 } from "@/lib/api";
+
+const CONSENT_STATUS_STYLE: Record<ConsentLine["status"], string> = {
+  granted: "bg-green-soft text-green-strong",
+  withdrawn: "bg-red-soft text-red-strong",
+  not_given: "bg-line-2 text-mute",
+};
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 import { LeaveStatusBadge } from "@/components/LeaveStatusBadge";
@@ -64,6 +73,7 @@ export default function SelfServicePage() {
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
+  const [consent, setConsent] = useState<ConsentLine[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,7 +90,16 @@ export default function SelfServicePage() {
           .catch(() => {});
       })
       .catch((e: Error) => setError(e.message));
+    fetchConsent().then(setConsent).catch(() => {});
   }, []);
+
+  async function toggleConsent(purpose: string, grant: boolean) {
+    try {
+      setConsent(await decideConsent(purpose, grant));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   const leaveAvailable = balances.reduce((s, b) => s + Number(b.available), 0);
   const latestNet = payslips[0]?.net_pay;
@@ -228,6 +247,55 @@ export default function SelfServicePage() {
           </div>
         </Panel>
       </div>
+
+      {consent.length > 0 && (
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-4 py-2.5">
+            <h2 className="text-sm font-semibold text-ink">Data &amp; privacy consent</h2>
+            <p className="text-[11px] text-mute">
+              Manage how Atvantiq processes your personal data (DPDP Act). You can
+              withdraw consent at any time.
+            </p>
+          </div>
+          <div className="divide-y divide-line-2">
+            {consent.map((c) => (
+              <div key={c.purpose} className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-ink">{c.label}</span>
+                    {c.required && (
+                      <span className="rounded-full bg-warn-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase text-warn-strong">
+                        needed for employment
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-mute">{c.description}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${CONSENT_STATUS_STYLE[c.status]}`}>
+                    {c.status.replace("_", " ")}
+                  </span>
+                  {c.status === "granted" ? (
+                    <button
+                      onClick={() => toggleConsent(c.purpose, false)}
+                      className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-mute hover:text-red-strong"
+                    >
+                      Withdraw
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => toggleConsent(c.purpose, true)}
+                      className="rounded-md bg-ink px-3 py-1 text-[11px] font-medium text-surface hover:bg-ink-2"
+                    >
+                      Grant
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

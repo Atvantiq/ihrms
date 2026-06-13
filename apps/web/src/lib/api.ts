@@ -1071,6 +1071,25 @@ export function cancelAdvance(id: string): Promise<Advance> {
   return apiPost<Advance>(`/advances/${id}/cancel`, {});
 }
 
+// ----------------------------------------------------------------- consent
+
+export interface ConsentLine {
+  purpose: string;
+  label: string;
+  description: string;
+  required: boolean;
+  version: number;
+  status: "granted" | "withdrawn" | "not_given";
+  decided_at: string | null;
+}
+
+export function fetchConsent(employeeId?: number): Promise<ConsentLine[]> {
+  return apiGet<ConsentLine[]>(`/consent${employeeId ? `?employee_id=${employeeId}` : ""}`);
+}
+export function decideConsent(purpose: string, grant: boolean): Promise<ConsentLine[]> {
+  return apiPost<ConsentLine[]>("/consent", { purpose, grant });
+}
+
 // ----------------------------------------------------------------- leave
 
 export interface LeaveType {
