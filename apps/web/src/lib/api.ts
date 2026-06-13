@@ -851,6 +851,44 @@ export function fetchWall(): Promise<Feedback[]> {
   return apiGet<Feedback[]>("/feedback/wall");
 }
 
+// ----------------------------------------------------------------- helpdesk
+
+export interface Ticket {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  category: string;
+  subject: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  status: "open" | "in_progress" | "resolved" | "closed";
+  assignee_id: number | null;
+  assignee_name: string | null;
+  resolution: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+export function fetchTicketCategories(): Promise<string[]> {
+  return apiGet<string[]>("/tickets/categories");
+}
+export function fetchTickets(scope: "mine" | "assigned" | "all" = "mine"): Promise<Ticket[]> {
+  return apiGet<Ticket[]>(`/tickets?scope=${scope}`);
+}
+export function raiseTicket(body: {
+  category: string;
+  subject: string;
+  description: string;
+  priority: string;
+}): Promise<Ticket> {
+  return apiPost<Ticket>("/tickets", body);
+}
+export function assignTicket(id: string, assigneeId: number): Promise<Ticket> {
+  return apiPost<Ticket>(`/tickets/${id}/assign`, { assignee_id: assigneeId });
+}
+export function setTicketStatus(id: string, status: string, resolution?: string): Promise<Ticket> {
+  return apiPost<Ticket>(`/tickets/${id}/status`, { status, resolution: resolution ?? null });
+}
+
 // ----------------------------------------------------------------- duty (OOD/WFH)
 
 export interface Duty {

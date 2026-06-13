@@ -211,6 +211,25 @@ async def inbox(
                 )
             )
 
+        # 3b) Open helpdesk tickets.
+        open_tickets = await _scalar(
+            session,
+            "select count(*) from ihrms.ticket where status in ('open','in_progress')",
+        )
+        if open_tickets:
+            decisions.append(
+                Decision(
+                    kind="open_tickets",
+                    severity=severity_for_count(open_tickets, high_at=10),
+                    icon="✉",
+                    title=f"{open_tickets} open helpdesk ticket{'s' if open_tickets != 1 else ''}",
+                    detail="Employee requests awaiting resolution.",
+                    action_label="Open",
+                    action_href="/helpdesk",
+                    count=open_tickets,
+                )
+            )
+
         # 4) Exit / F&F settlements mid-flight.
         exits = await _scalar(
             session,

@@ -21,6 +21,7 @@ export const NAV: NavSection[] = [
       { label: "Dashboard", href: "/dashboard", icon: "▦" },
       { label: "Tasks", href: "/tasks", icon: "⊟" },
       { label: "Self-service", href: "/self-service", icon: "◇" },
+      { label: "Helpdesk", href: "/helpdesk", icon: "✉" },
       { label: "Reports", href: "/reports", icon: "▤", hrOnly: true },
     ],
   },
