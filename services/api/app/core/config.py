@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     # Comma-separated origins for the web app
     cors_origins: str = "http://localhost:3000"
 
+    # Rate limiting — empty = in-memory (single instance). Set redis://… in prod.
+    ratelimit_storage_uri: str = ""
+
+    # Log level
+    log_level: str = "INFO"
+
     @property
     def sqlalchemy_async_url(self) -> str:
         if self.database_url_async:

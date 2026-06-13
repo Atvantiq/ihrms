@@ -13,6 +13,7 @@ dependencies = [
     "psycopg2-binary>=2.9",          # sync driver for Alembic
     "alembic>=1.14",
     "python-jose[cryptography]>=3.3", # Supabase JWT validation
+    "slowapi>=0.1.9",                 # rate limiting
     "httpx>=0.28",
 ]
 
