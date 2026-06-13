@@ -35,6 +35,46 @@ PT_AMOUNT = D(200)  # flat monthly PT above the threshold
 
 
 @dataclass(frozen=True)
+class StatutoryRates:
+    """The rate parameters payroll consumes. The DEFAULT mirrors the FY2025-26
+    constants; a tenant's payroll loads these from the active statutory pack
+    published by the control plane (TB2 → M3 gate)."""
+
+    pf_rate: Decimal = PF_RATE
+    pf_ceiling: Decimal = PF_WAGE_CEILING
+    esi_employee: Decimal = ESI_EMPLOYEE_RATE
+    esi_employer: Decimal = ESI_EMPLOYER_RATE
+    esi_gross_ceiling: Decimal = ESI_GROSS_CEILING
+    pt_amount: Decimal = PT_AMOUNT
+    pt_exempt_below: Decimal = PT_EXEMPT_BELOW
+    cess: Decimal = Decimal("0.04")
+
+
+DEFAULT_RATES = StatutoryRates()
+
+
+def rates_from_pack(pack: dict[str, object]) -> StatutoryRates:
+    """Build StatutoryRates from a statutory_pack `rates` JSON, falling back to
+    the defaults for any missing key."""
+    d = DEFAULT_RATES
+
+    def g(key: str, default: Decimal) -> Decimal:
+        v = pack.get(key)
+        return Decimal(str(v)) if v is not None else default
+
+    return StatutoryRates(
+        pf_rate=g("pf_rate", d.pf_rate),
+        pf_ceiling=g("pf_ceiling", d.pf_ceiling),
+        esi_employee=g("esi_employee", d.esi_employee),
+        esi_employer=g("esi_employer", d.esi_employer),
+        esi_gross_ceiling=g("esi_gross_ceiling", d.esi_gross_ceiling),
+        pt_amount=g("pt_amount", d.pt_amount),
+        pt_exempt_below=g("pt_exempt_below", d.pt_exempt_below),
+        cess=g("cess", d.cess),
+    )
+
+
+@dataclass(frozen=True)
 class PFResult:
     employee: Decimal
     employer: Decimal
@@ -43,12 +83,14 @@ class PFResult:
     pf_wage: Decimal
 
 
-def compute_pf(basic: Decimal, *, voluntary_full_basic: bool = False) -> PFResult:
+def compute_pf(
+    basic: Decimal, *, voluntary_full_basic: bool = False, rates: StatutoryRates = DEFAULT_RATES
+) -> PFResult:
     """EPF on basic (proxy for basic+DA). Capped at the statutory ceiling
     unless the employer contributes on full basic (voluntary)."""
-    pf_wage = basic if voluntary_full_basic else min(basic, PF_WAGE_CEILING)
-    employee = round_rupee(pf_wage * PF_RATE)
-    employer = round_rupee(pf_wage * PF_RATE)
+    pf_wage = basic if voluntary_full_basic else min(basic, rates.pf_ceiling)
+    employee = round_rupee(pf_wage * rates.pf_rate)
+    employer = round_rupee(pf_wage * rates.pf_rate)
     eps_wage = min(pf_wage, EPS_WAGE_CEILING)
     employer_pension = round_rupee(eps_wage * EPS_RATE)
     employer_pf = employer - employer_pension
@@ -62,16 +104,16 @@ class ESIResult:
     employer: Decimal
 
 
-def compute_esi(gross: Decimal) -> ESIResult:
+def compute_esi(gross: Decimal, *, rates: StatutoryRates = DEFAULT_RATES) -> ESIResult:
     """ESI applies only when monthly gross is within the ceiling. Both shares
     are rounded UP to the next rupee per ESIC rules."""
-    if gross > ESI_GROSS_CEILING:
+    if gross > rates.esi_gross_ceiling:
         return ESIResult(False, D(0), D(0))
-    employee = (gross * ESI_EMPLOYEE_RATE).to_integral_value(rounding="ROUND_CEILING")
-    employer = (gross * ESI_EMPLOYER_RATE).to_integral_value(rounding="ROUND_CEILING")
+    employee = (gross * rates.esi_employee).to_integral_value(rounding="ROUND_CEILING")
+    employer = (gross * rates.esi_employer).to_integral_value(rounding="ROUND_CEILING")
     return ESIResult(True, employee, employer)
 
 
-def compute_pt(gross: Decimal) -> Decimal:
+def compute_pt(gross: Decimal, *, rates: StatutoryRates = DEFAULT_RATES) -> Decimal:
     """Professional tax (state levy). Default Karnataka-style flat slab."""
-    return D(0) if gross <= PT_EXEMPT_BELOW else PT_AMOUNT
+    return D(0) if gross <= rates.pt_exempt_below else rates.pt_amount

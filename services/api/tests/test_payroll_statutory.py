@@ -104,3 +104,24 @@ class TestPayslip:
         s = derive_structure(D(1200000))
         with pytest.raises(ValueError, match="lop_days"):
             compute_payslip(s, working_days=30, lop_days=D(31))
+
+
+class TestStatutoryRatesOverride:
+    def test_pf_ceiling_from_rates(self) -> None:
+        from app.contexts.payroll.statutory import StatutoryRates, compute_pf
+        from app.core.money import D
+        # raise the PF ceiling to 25000 -> 12% of 25000 = 3000 (vs default 1800)
+        hi = StatutoryRates(pf_ceiling=D(25000))
+        assert compute_pf(D(50000), rates=hi).employee == D(3000)
+
+    def test_pt_amount_from_rates(self) -> None:
+        from app.contexts.payroll.statutory import StatutoryRates, compute_pt
+        from app.core.money import D
+        custom = StatutoryRates(pt_amount=D(300))
+        assert compute_pt(D(50000), rates=custom) == D(300)
+
+    def test_rates_from_pack_falls_back(self) -> None:
+        from app.contexts.payroll.statutory import DEFAULT_RATES, rates_from_pack
+        r = rates_from_pack({"pf_ceiling": 20000})  # only one key
+        assert r.pf_ceiling.__str__() == "20000"
+        assert r.pt_amount == DEFAULT_RATES.pt_amount  # missing -> default

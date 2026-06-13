@@ -21,6 +21,7 @@ from app.contexts.identity.principal import (
 from app.contexts.payroll.outputs import gl_journal, statutory_totals
 from app.contexts.payroll.pdf import payslip_pdf
 from app.contexts.payroll.salary import SalaryStructure, compute_payslip, derive_structure
+from app.contexts.payroll.statutory import DEFAULT_RATES, StatutoryRates, rates_from_pack
 from app.contexts.payroll.tds import monthly_tds
 from app.core.audit import record_audit
 from app.core.db import get_session
@@ -192,6 +193,18 @@ async def get_structure(
 
 # ---------------------------------------------------------------- runs
 
+async def _active_rates(session: AsyncSession) -> StatutoryRates:
+    """Load the control plane's active statutory pack; fall back to the
+    built-in FY25-26 defaults if none is published."""
+    pack = (
+        await session.execute(
+            text("""select rates from ihrms.statutory_pack where is_active
+                    order by effective_from desc limit 1""")
+        )
+    ).scalar()
+    return rates_from_pack(pack) if pack else DEFAULT_RATES
+
+
 class RunIn(BaseModel):
     period_year: int = Field(ge=2020, le=2100)
     period_month: int = Field(ge=1, le=12)
@@ -250,6 +263,8 @@ async def create_run(
     # end-of-period date so attendance LOP reflects the whole month
     period_end = date(payload.period_year, payload.period_month,
                       calendar.monthrange(payload.period_year, payload.period_month)[1])
+    # statutory rates from the control plane's active pack (TB2 -> M3 gate)
+    rates = await _active_rates(session)
 
     total_gross = D(0)
     total_net = D(0)
@@ -270,7 +285,7 @@ async def create_run(
         # is for the attendance view's "needs attention", not for pay.
         slip = compute_payslip(
             s, working_days=payload.working_days,
-            lop_days=D(att.absent), declared_tds=tds,
+            lop_days=D(att.absent), declared_tds=tds, rates=rates,
         )
         await session.execute(
             text("""insert into ihrms.payslip

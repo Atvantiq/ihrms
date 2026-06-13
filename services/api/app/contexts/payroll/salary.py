@@ -3,7 +3,13 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from app.contexts.payroll.statutory import compute_esi, compute_pf, compute_pt
+from app.contexts.payroll.statutory import (
+    DEFAULT_RATES,
+    StatutoryRates,
+    compute_esi,
+    compute_pf,
+    compute_pt,
+)
 from app.core.money import D, Money, round_money
 
 # Default structuring ratios (overridable per employee by HR)
@@ -55,9 +61,11 @@ def compute_payslip(
     working_days: int = 30,
     lop_days: Decimal = ZERO,
     declared_tds: Money = ZERO,
+    rates: StatutoryRates = DEFAULT_RATES,
 ) -> Payslip:
     """Compute one month's payslip from a structure, with loss-of-pay
-    proration. PF is on (prorated) basic; ESI/PT on prorated gross."""
+    proration. PF is on (prorated) basic; ESI/PT on prorated gross. Rates
+    come from the tenant's active statutory pack (defaults to FY25-26)."""
     if lop_days < 0 or lop_days > working_days:
         raise ValueError("lop_days must be between 0 and working_days")
 
@@ -67,9 +75,9 @@ def compute_payslip(
     special = round_money(s.special_allowance * paid_ratio)
     gross = basic + hra + special
 
-    pf = compute_pf(basic)
-    esi = compute_esi(gross)
-    pt = compute_pt(gross)
+    pf = compute_pf(basic, rates=rates)
+    esi = compute_esi(gross, rates=rates)
+    pt = compute_pt(gross, rates=rates)
 
     deductions: dict[str, Money] = {"pf_employee": pf.employee, "pt": pt}
     if esi.applicable:
