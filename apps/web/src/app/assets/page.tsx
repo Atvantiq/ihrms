@@ -5,19 +5,29 @@ import {
   addMaintenance,
   approveAssetRequest,
   assignAsset,
+  assignLicenseSeat,
   createAsset,
+  createLicense,
   fetchAssetRequests,
   fetchAssets,
   fetchDepreciation,
   fetchEmployees,
+  fetchLicenses,
+  fetchLicenseSeats,
+  fetchLostAssets,
   fetchMaintenance,
+  markAssetLost,
   rejectAssetRequest,
   returnAsset,
+  revokeLicenseSeat,
   type Asset,
   type AssetRequest,
   type DepreciationReport,
   type EmployeeListItem,
+  type LicenseSeat,
+  type LostAsset,
   type Maintenance,
+  type SoftwareLicense,
 } from "@/lib/api";
 
 const STATUS_STYLE: Record<Asset["status"], string> = {
@@ -209,6 +219,196 @@ function MaintenancePanel({ asset, onError }: { asset: Asset; onError: (m: strin
   );
 }
 
+const LICENSE_STATUS: Record<string, string> = {
+  active: "bg-green-soft text-green-strong",
+  expiring: "bg-warn-soft text-warn-strong",
+  expired: "bg-red-soft text-red-strong",
+  none: "bg-line-2 text-mute",
+};
+
+function LicensesPanel({
+  employees,
+  onError,
+}: {
+  employees: EmployeeListItem[];
+  onError: (m: string) => void;
+}) {
+  const [licenses, setLicenses] = useState<SoftwareLicense[]>([]);
+  const [seats, setSeats] = useState<Record<string, LicenseSeat[]>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const reload = useCallback(() => {
+    fetchLicenses().then(setLicenses).catch((e) => onError(e.message));
+  }, [onError]);
+  useEffect(() => reload(), [reload]);
+
+  function loadSeats(id: string) {
+    fetchLicenseSeats(id).then((s) => setSeats((p) => ({ ...p, [id]: s }))).catch(() => {});
+  }
+  function toggle(id: string) {
+    setExpanded((cur) => (cur === id ? null : id));
+    if (expanded !== id) loadSeats(id);
+  }
+
+  async function add(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await createLicense({
+        name: fd.get("name") as string,
+        vendor: (fd.get("vendor") as string) || null,
+        seats_total: Number(fd.get("seats_total") || 1),
+        renewal_date: (fd.get("renewal_date") as string) || null,
+        cost_annual: (fd.get("cost_annual") as string) || "0",
+      });
+      form.reset();
+      setAdding(false);
+      reload();
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
+
+  async function assign(id: string, employeeId: number) {
+    try {
+      await assignLicenseSeat(id, employeeId);
+      reload();
+      loadSeats(id);
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+  async function revoke(id: string, seatId: string) {
+    try {
+      await revokeLicenseSeat(seatId);
+      reload();
+      loadSeats(id);
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+        <h2 className="text-sm font-semibold text-ink">
+          Software licenses <span className="font-normal text-mute">({licenses.length})</span>
+        </h2>
+        <button onClick={() => setAdding(!adding)} className="text-xs font-medium text-blue-strong hover:underline">
+          {adding ? "Cancel" : "+ License"}
+        </button>
+      </div>
+      {adding && (
+        <form onSubmit={add} className="flex flex-wrap items-end gap-2 border-b border-line bg-canvas p-3">
+          <input name="name" required placeholder="Name" className="rounded-lg border border-line px-2 py-1.5 text-sm" />
+          <input name="vendor" placeholder="Vendor" className="rounded-lg border border-line px-2 py-1.5 text-sm" />
+          <input name="seats_total" type="number" min="0" defaultValue="5" placeholder="Seats" className="w-20 rounded-lg border border-line px-2 py-1.5 text-sm" />
+          <input name="renewal_date" type="date" className="rounded-lg border border-line px-2 py-1.5 text-sm" />
+          <input name="cost_annual" type="number" min="0" placeholder="Cost ₹/yr" className="w-28 rounded-lg border border-line px-2 py-1.5 text-sm" />
+          <button className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface">Add</button>
+        </form>
+      )}
+      <div className="divide-y divide-line-2">
+        {licenses.map((l) => (
+          <div key={l.id}>
+            <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <button onClick={() => toggle(l.id)} className="text-left">
+                <span className="font-medium text-ink">{l.name}</span>
+                {l.vendor && <span className="ml-2 text-[11px] text-mute">{l.vendor}</span>}
+              </button>
+              <span className="flex items-center gap-3 text-[11px]">
+                <span className="text-mute">
+                  <span className="font-semibold text-ink">{l.seats_used}</span>/{l.seats_total} seats
+                </span>
+                {l.renewal_date && (
+                  <span className={`rounded-full px-2 py-0.5 font-medium ${LICENSE_STATUS[l.renewal_status]}`}>
+                    {l.renewal_status === "active" ? l.renewal_date : l.renewal_status}
+                  </span>
+                )}
+                <button onClick={() => toggle(l.id)} className="text-mute hover:text-ink">
+                  {expanded === l.id ? "▾" : "▸"}
+                </button>
+              </span>
+            </div>
+            {expanded === l.id && (
+              <div className="border-t border-line-2 bg-canvas px-4 py-2">
+                <div className="space-y-1">
+                  {(seats[l.id] ?? []).filter((s) => s.status === "active").map((s) => (
+                    <div key={s.id} className="flex items-center justify-between text-[12px]">
+                      <span className="text-ink">{s.employee_name ?? s.employee_id}</span>
+                      <button onClick={() => revoke(l.id, s.id)} className="text-[11px] text-mute hover:text-red-strong">
+                        revoke
+                      </button>
+                    </div>
+                  ))}
+                  {(seats[l.id] ?? []).filter((s) => s.status === "active").length === 0 && (
+                    <p className="text-[11px] text-mute-2">No seats assigned.</p>
+                  )}
+                </div>
+                {l.seats_available > 0 && (
+                  <select
+                    defaultValue=""
+                    onChange={(e) => e.target.value && assign(l.id, Number(e.target.value))}
+                    className="mt-2 rounded-md border border-line px-2 py-1 text-[11px]"
+                  >
+                    <option value="">Assign seat to…</option>
+                    {employees.map((emp) => (
+                      <option key={emp.employee_id} value={emp.employee_id}>{emp.full_name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        {licenses.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm text-mute">No licenses tracked.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LostPanel({ onError }: { onError: (m: string) => void }) {
+  const [rows, setRows] = useState<LostAsset[]>([]);
+  useEffect(() => {
+    fetchLostAssets().then(setRows).catch((e) => onError(e.message));
+  }, [onError]);
+  return (
+    <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+        Lost register <span className="font-normal text-mute">({rows.length})</span>
+      </div>
+      <table className="w-full text-left text-sm">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.asset_id} className="border-b border-line-2 last:border-0">
+              <td className="px-4 py-2">
+                <span className="font-medium text-ink">{r.name}</span>
+                <span className="ml-2 font-mono text-[10px] text-mute">{r.asset_tag}</span>
+              </td>
+              <td className="px-3 py-2 text-[11px] text-mute">{r.circumstances}</td>
+              <td className="px-3 py-2 text-[11px] text-mute">{r.reported_on}</td>
+              <td className="px-3 py-2 text-right">
+                {r.police_report && (
+                  <span className="rounded-full bg-red-soft px-2 py-0.5 text-[10px] font-medium text-red-strong">
+                    police report
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td className="px-4 py-6 text-center text-sm text-mute">No lost assets.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
@@ -218,6 +418,8 @@ export default function AssetsPage() {
   const [dep, setDep] = useState<DepreciationReport | null>(null);
   const [showDep, setShowDep] = useState(false);
   const [showReqs, setShowReqs] = useState(false);
+  const [showLicenses, setShowLicenses] = useState(false);
+  const [showLost, setShowLost] = useState(false);
   const [maintaining, setMaintaining] = useState<Asset | null>(null);
 
   const reload = useCallback(() => {
@@ -270,6 +472,16 @@ export default function AssetsPage() {
       setError((e as Error).message);
     }
   }
+  async function doLost(assetId: string) {
+    const circumstances = window.prompt("Circumstances of loss?");
+    if (!circumstances) return;
+    try {
+      await markAssetLost(assetId, circumstances, window.confirm("Police report filed?"));
+      reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   const inStock = assets.filter((a) => a.status === "in_stock").length;
   const assigned = assets.filter((a) => a.status === "assigned").length;
@@ -288,6 +500,18 @@ export default function AssetsPage() {
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
           >
             {showReqs ? "Hide" : "Requests"}
+          </button>
+          <button
+            onClick={() => setShowLicenses(!showLicenses)}
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
+          >
+            {showLicenses ? "Hide" : "Licenses"}
+          </button>
+          <button
+            onClick={() => setShowLost(!showLost)}
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
+          >
+            {showLost ? "Hide" : "Lost register"}
           </button>
           <button
             onClick={() => setShowDep(!showDep)}
@@ -353,6 +577,10 @@ export default function AssetsPage() {
           onChanged={reload}
         />
       )}
+
+      {showLicenses && <LicensesPanel employees={employees} onError={setError} />}
+
+      {showLost && <LostPanel onError={setError} />}
 
       {maintaining && <MaintenancePanel asset={maintaining} onError={setError} />}
 
@@ -458,6 +686,14 @@ export default function AssetsPage() {
                   >
                     🔧
                   </button>
+                  {a.status !== "lost" && a.status !== "retired" && (
+                    <button
+                      onClick={() => doLost(a.id)}
+                      className="ml-1 rounded-md border border-line px-2 py-1 text-[11px] font-medium text-mute hover:text-red-strong"
+                    >
+                      Lost
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -2071,6 +2071,79 @@ export function addMaintenance(assetId: string, body: {
   return apiPost<Maintenance>(`/assets/${assetId}/maintenance`, body);
 }
 
+// ---- software licenses + lost register
+
+export interface SoftwareLicense {
+  id: string;
+  name: string;
+  vendor: string | null;
+  seats_total: number;
+  seats_used: number;
+  seats_available: number;
+  renewal_date: string | null;
+  cost_annual: string;
+  renewal_status: "none" | "active" | "expiring" | "expired";
+  notes: string | null;
+}
+export interface LicenseSeat {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  assigned_on: string;
+  status: string;
+}
+export function fetchLicenses(): Promise<SoftwareLicense[]> {
+  return apiGet<SoftwareLicense[]>("/assets/licenses");
+}
+export function createLicense(body: {
+  name: string;
+  vendor?: string | null;
+  seats_total: number;
+  renewal_date?: string | null;
+  cost_annual?: string;
+}): Promise<SoftwareLicense> {
+  return apiPost<SoftwareLicense>("/assets/licenses", body);
+}
+export function fetchLicenseSeats(licenseId: string): Promise<LicenseSeat[]> {
+  return apiGet<LicenseSeat[]>(`/assets/licenses/${licenseId}/seats`);
+}
+export function assignLicenseSeat(
+  licenseId: string,
+  employeeId: number,
+): Promise<SoftwareLicense> {
+  return apiPost<SoftwareLicense>(`/assets/licenses/${licenseId}/assign`, {
+    employee_id: employeeId,
+  });
+}
+export async function revokeLicenseSeat(seatId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/assets/licenses/seats/${seatId}/revoke`, {
+    method: "POST",
+    headers: { ...(await authHeader()) },
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`Revoke failed (${res.status})`);
+}
+export interface LostAsset {
+  asset_id: string;
+  asset_tag: string;
+  name: string;
+  reported_on: string;
+  circumstances: string;
+  police_report: boolean;
+}
+export function fetchLostAssets(): Promise<LostAsset[]> {
+  return apiGet<LostAsset[]>("/assets/lost");
+}
+export function markAssetLost(
+  assetId: string,
+  circumstances: string,
+  policeReport: boolean,
+): Promise<Asset> {
+  return apiPost<Asset>(`/assets/${assetId}/lost`, {
+    circumstances,
+    police_report: policeReport,
+  });
+}
+
 // ----------------------------------------------------------------- advances
 
 export interface Advance {

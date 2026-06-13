@@ -56,3 +56,16 @@ def book_value(
 
     remaining_fraction = (life_days - elapsed_days) / life_days
     return round_rupee(purchase_cost * remaining_fraction)
+
+
+def license_renewal_status(renewal_date: date | None, today: date) -> str:
+    """Classify a license by its renewal date: 'expired' (past), 'expiring'
+    (within 30 days), 'active' (later), or 'none' when no date is set."""
+    if renewal_date is None:
+        return "none"
+    days = (renewal_date - today).days
+    if days < 0:
+        return "expired"
+    if days <= 30:
+        return "expiring"
+    return "active"

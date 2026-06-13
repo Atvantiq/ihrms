@@ -14,7 +14,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contexts.assets.service import book_value, can_assign, can_return
+from app.contexts.assets.service import (
+    book_value,
+    can_assign,
+    can_return,
+    license_renewal_status,
+)
 from app.contexts.identity.principal import (
     ROLE_HR_ADMIN,
     Principal,
@@ -530,3 +535,246 @@ async def add_maintenance(
     out = MaintenanceOut(**dict(row))
     await session.commit()
     return out
+
+
+# ============================================================ software licenses
+
+class LicenseOut(BaseModel):
+    id: str
+    name: str
+    vendor: str | None = None
+    seats_total: int
+    seats_used: int
+    seats_available: int
+    renewal_date: date | None = None
+    cost_annual: Decimal
+    renewal_status: str
+    notes: str | None = None
+
+
+class LicenseIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    vendor: str | None = None
+    seats_total: int = Field(default=1, ge=0, le=100000)
+    renewal_date: date | None = None
+    cost_annual: Decimal = Field(default=D(0), ge=0)
+    notes: str | None = None
+
+
+class SeatOut(BaseModel):
+    id: str
+    employee_id: int
+    employee_name: str | None = None
+    assigned_on: date
+    status: str
+
+
+def _license_out(r: dict[str, Any], today: date) -> LicenseOut:
+    used = int(r["seats_used"])
+    total = int(r["seats_total"])
+    return LicenseOut(
+        id=r["id"], name=r["name"], vendor=r["vendor"], seats_total=total,
+        seats_used=used, seats_available=max(0, total - used),
+        renewal_date=r["renewal_date"], cost_annual=r["cost_annual"],
+        renewal_status=license_renewal_status(r["renewal_date"], today),
+        notes=r["notes"],
+    )
+
+
+_LICENSE_SELECT = """
+    select l.id::text, l.name, l.vendor, l.seats_total, l.renewal_date,
+           l.cost_annual, l.notes,
+           (select count(*) from ihrms.license_seat s
+            where s.license_id = l.id and s.status = 'active') as seats_used
+    from ihrms.software_license l
+"""
+
+
+@router.get("/licenses", response_model=list[LicenseOut])
+async def list_licenses(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> list[LicenseOut]:
+    rows = (
+        await session.execute(text(_LICENSE_SELECT + " order by l.name"))
+    ).mappings().all()
+    today = date.today()
+    return [_license_out(dict(r), today) for r in rows]
+
+
+@router.post("/licenses", response_model=LicenseOut, status_code=201)
+async def create_license(
+    payload: LicenseIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> LicenseOut:
+    lid = (
+        await session.execute(
+            text("""insert into ihrms.software_license
+                    (name, vendor, seats_total, renewal_date, cost_annual, notes)
+                    values (:n, :v, :st, :rd, :c, :no) returning id::text"""),
+            {"n": payload.name, "v": payload.vendor, "st": payload.seats_total,
+             "rd": payload.renewal_date, "c": payload.cost_annual, "no": payload.notes},
+        )
+    ).scalar_one()
+    row = (
+        await session.execute(text(_LICENSE_SELECT + " where l.id = cast(:id as uuid)"),
+                              {"id": lid})
+    ).mappings().one()
+    out = _license_out(dict(row), date.today())
+    await session.commit()
+    return out
+
+
+@router.get("/licenses/{license_id}/seats", response_model=list[SeatOut])
+async def list_seats(
+    license_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> list[SeatOut]:
+    rows = (
+        await session.execute(
+            text("""select s.id::text, s.employee_id, s.assigned_on, s.status,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.license_seat s
+                    left join public.employees e on e.employee_id = s.employee_id
+                    where s.license_id = cast(:l as uuid) order by s.assigned_on desc"""),
+            {"l": license_id},
+        )
+    ).mappings().all()
+    return [
+        SeatOut(id=r["id"], employee_id=r["employee_id"], employee_name=r["nm"] or None,
+                assigned_on=r["assigned_on"], status=r["status"])
+        for r in rows
+    ]
+
+
+class SeatIn(BaseModel):
+    employee_id: int
+
+
+@router.post("/licenses/{license_id}/assign", response_model=LicenseOut, status_code=201)
+async def assign_seat(
+    license_id: str,
+    payload: SeatIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> LicenseOut:
+    lic = (
+        await session.execute(text(_LICENSE_SELECT + " where l.id = cast(:id as uuid)"),
+                              {"id": license_id})
+    ).mappings().first()
+    if lic is None:
+        raise HTTPException(404, "License not found")
+    if int(lic["seats_used"]) >= int(lic["seats_total"]):
+        raise HTTPException(409, "No seats available")
+    dup = (
+        await session.execute(
+            text("""select 1 from ihrms.license_seat
+                    where license_id = cast(:l as uuid) and employee_id = :e
+                      and status = 'active'"""),
+            {"l": license_id, "e": payload.employee_id},
+        )
+    ).scalar()
+    if dup:
+        raise HTTPException(409, "Employee already holds a seat")
+    await session.execute(
+        text("""insert into ihrms.license_seat (license_id, employee_id)
+                values (cast(:l as uuid), :e)"""),
+        {"l": license_id, "e": payload.employee_id},
+    )
+    row = (
+        await session.execute(text(_LICENSE_SELECT + " where l.id = cast(:id as uuid)"),
+                              {"id": license_id})
+    ).mappings().one()
+    out = _license_out(dict(row), date.today())
+    await session.commit()
+    return out
+
+
+@router.post("/licenses/seats/{seat_id}/revoke", status_code=204)
+async def revoke_seat(
+    seat_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> None:
+    await session.execute(
+        text("update ihrms.license_seat set status='revoked' where id = cast(:id as uuid)"),
+        {"id": seat_id},
+    )
+    await session.commit()
+
+
+# ============================================================ lost register
+
+class LostIn(BaseModel):
+    circumstances: str = Field(min_length=1)
+    police_report: bool = False
+
+
+class LostOut(BaseModel):
+    asset_id: str
+    asset_tag: str
+    name: str
+    reported_on: date
+    circumstances: str
+    police_report: bool
+
+
+@router.post("/{asset_id}/lost", response_model=AssetOut)
+async def mark_lost(
+    asset_id: str,
+    payload: LostIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> AssetOut:
+    asset = (
+        await session.execute(
+            text("select status from ihrms.asset where id = cast(:id as uuid)"),
+            {"id": asset_id},
+        )
+    ).mappings().first()
+    if asset is None:
+        raise HTTPException(404, "Asset not found")
+    if asset["status"] == "lost":
+        raise HTTPException(409, "Asset already marked lost")
+    # close any open assignment, then flag the asset and record the circumstances
+    await session.execute(
+        text("""update ihrms.asset_assignment set status='returned', returned_on=current_date
+                where asset_id = cast(:id as uuid) and status='assigned'"""),
+        {"id": asset_id},
+    )
+    await session.execute(
+        text("update ihrms.asset set status='lost', updated_at=now() where id = cast(:id as uuid)"),
+        {"id": asset_id},
+    )
+    await session.execute(
+        text("""insert into ihrms.asset_lost (asset_id, circumstances, police_report, created_by)
+                values (cast(:id as uuid), :c, :p, :by)"""),
+        {"id": asset_id, "c": payload.circumstances, "p": payload.police_report,
+         "by": principal.employee_id},
+    )
+    await record_audit(session, principal, "asset.lost", "asset", asset_id,
+                       summary="Asset marked lost")
+    out = (await session.execute(text(_SELECT + " where a.id = :id"),
+                                 {"id": asset_id})).mappings().one()
+    result = _to_out(dict(out), date.today())
+    await session.commit()
+    return result
+
+
+@router.get("/lost", response_model=list[LostOut])
+async def lost_register(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> list[LostOut]:
+    rows = (
+        await session.execute(
+            text("""select a.id::text as asset_id, a.asset_tag, a.name,
+                       l.reported_on, l.circumstances, l.police_report
+                    from ihrms.asset_lost l
+                    join ihrms.asset a on a.id = l.asset_id
+                    order by l.reported_on desc""")
+        )
+    ).mappings().all()
+    return [LostOut(**dict(r)) for r in rows]
