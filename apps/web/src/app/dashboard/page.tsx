@@ -2,8 +2,28 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchDashboard, type DashboardSummary } from "@/lib/api";
+import {
+  fetchAnnouncements,
+  fetchDashboard,
+  type Announcement,
+  type DashboardSummary,
+} from "@/lib/api";
 import { Avatar } from "@/components/Avatar";
+
+const BANNER_STYLE: Record<Announcement["level"], string> = {
+  info: "border-blue-soft bg-blue-soft/40 text-blue-strong",
+  success: "border-green-soft bg-green-soft/40 text-green-strong",
+  warning: "border-warn-soft bg-warn-soft/40 text-warn-strong",
+};
+
+function AnnouncementBanner({ a }: { a: Announcement }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${BANNER_STYLE[a.level]}`}>
+      <div className="text-sm font-semibold">{a.title}</div>
+      <div className="mt-0.5 text-xs opacity-90">{a.body}</div>
+    </div>
+  );
+}
 
 function StatTile({
   label,
@@ -49,12 +69,16 @@ function Panel({
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboard()
       .then(setData)
       .catch((e: Error) => setError(e.message));
+    fetchAnnouncements()
+      .then(setAnnouncements)
+      .catch(() => {});
   }, []);
 
   return (
@@ -67,6 +91,14 @@ export default function DashboardPage() {
       {error && (
         <div className="rounded-xl border border-red-soft bg-red-soft/50 p-3 text-sm text-red-strong">
           {error}
+        </div>
+      )}
+
+      {announcements.length > 0 && (
+        <div className="space-y-2">
+          {announcements.map((a) => (
+            <AnnouncementBanner key={a.id} a={a} />
+          ))}
         </div>
       )}
 

@@ -13,7 +13,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contexts.identity.principal import ROLE_SUPER_ADMIN, Principal, require_roles
+from app.contexts.identity.principal import (
+    ROLE_SUPER_ADMIN,
+    Principal,
+    get_current_principal,
+    require_roles,
+)
 from app.core.audit import record_audit
 from app.core.config import get_settings
 from app.core.db import get_session
@@ -291,3 +296,72 @@ async def platform_insights(
         "billable_employees": total_emp,
         "mrr": str(mrr),
     }
+
+
+# ---------------------------------------------------------------- announcements
+
+class AnnouncementOut(BaseModel):
+    id: str
+    title: str
+    body: str
+    level: str
+    created_at: str
+
+
+class AnnouncementIn(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    body: str = Field(min_length=1, max_length=2000)
+    level: str = Field(default="info", pattern=r"^(info|success|warning)$")
+
+
+@router.get("/announcements", response_model=list[AnnouncementOut])
+async def list_announcements(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> list[AnnouncementOut]:
+    """Active announcements — visible to every authenticated user."""
+    rows = (
+        await session.execute(
+            text("""select id::text, title, body, level, created_at::text
+                    from ihrms.announcement where is_active
+                    order by created_at desc limit 10""")
+        )
+    ).mappings().all()
+    return [AnnouncementOut(**dict(r)) for r in rows]
+
+
+@router.post("/announcements", response_model=AnnouncementOut, status_code=201)
+async def post_announcement(
+    payload: AnnouncementIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, SUPER],
+) -> AnnouncementOut:
+    row = (
+        await session.execute(
+            text("""insert into ihrms.announcement (title, body, level, created_by)
+                    values (:t, :b, :l, :by)
+                    returning id::text, title, body, level, created_at::text"""),
+            {"t": payload.title.strip(), "b": payload.body.strip(), "l": payload.level,
+             "by": principal.employee_id},
+        )
+    ).mappings().one()
+    await record_audit(
+        session, principal, "announcement.post", "announcement", row["id"],
+        summary=f"Posted: {payload.title.strip()}",
+    )
+    out = AnnouncementOut(**dict(row))
+    await session.commit()
+    return out
+
+
+@router.delete("/announcements/{ann_id}", status_code=204)
+async def retract_announcement(
+    ann_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, SUPER],
+) -> None:
+    await session.execute(
+        text("update ihrms.announcement set is_active=false where id=:id"),
+        {"id": ann_id},
+    )
+    await session.commit()

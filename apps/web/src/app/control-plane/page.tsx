@@ -3,17 +3,27 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   createTenant,
+  fetchAnnouncements,
   fetchPlans,
   fetchPlatformInsights,
   fetchStatutoryPacks,
   fetchTenants,
+  postAnnouncement,
+  retractAnnouncement,
   runBilling,
   setTenantStatus,
+  type Announcement,
   type Plan,
   type PlatformInsights,
   type StatutoryPack,
   type Tenant,
 } from "@/lib/api";
+
+const LEVEL_STYLE: Record<Announcement["level"], string> = {
+  info: "bg-blue-soft text-blue-strong",
+  success: "bg-green-soft text-green-strong",
+  warning: "bg-warn-soft text-warn-strong",
+};
 
 function inr(v: string | number): string {
   return "₹" + Number(v).toLocaleString("en-IN");
@@ -41,6 +51,7 @@ export default function ControlPlanePage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [packs, setPacks] = useState<StatutoryPack[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -48,6 +59,7 @@ export default function ControlPlanePage() {
   const reload = useCallback(() => {
     fetchPlatformInsights().then(setInsights).catch((e) => setError(e.message));
     fetchTenants().then(setTenants).catch((e) => setError(e.message));
+    fetchAnnouncements().then(setAnnouncements).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -55,6 +67,31 @@ export default function ControlPlanePage() {
     fetchPlans().then(setPlans).catch(() => {});
     fetchStatutoryPacks().then(setPacks).catch(() => {});
   }, [reload]);
+
+  async function broadcast(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await postAnnouncement({
+        title: fd.get("title") as string,
+        body: fd.get("body") as string,
+        level: fd.get("level") as string,
+      });
+      form.reset();
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  async function retract(id: string) {
+    try {
+      await retractAnnouncement(id);
+      reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function add(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -231,6 +268,43 @@ export default function ControlPlanePage() {
           </div>
         </section>
       </div>
+
+      <section className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+          Announcements <span className="font-normal text-mute">broadcast to every tenant&apos;s dashboard</span>
+        </div>
+        <form onSubmit={broadcast} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+          <input name="title" required maxLength={160} placeholder="Title" className="min-w-48 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <input name="body" required maxLength={2000} placeholder="Message" className="min-w-64 flex-[2] rounded-lg border border-line px-3 py-2 text-sm" />
+          <select name="level" defaultValue="info" className="rounded-lg border border-line px-2 py-2 text-sm">
+            <option value="info">Info</option>
+            <option value="success">Success</option>
+            <option value="warning">Warning</option>
+          </select>
+          <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Broadcast</button>
+        </form>
+        <div className="divide-y divide-line-2">
+          {announcements.length === 0 && (
+            <p className="px-4 py-3 text-sm text-mute">No active announcements.</p>
+          )}
+          {announcements.map((a) => (
+            <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${LEVEL_STYLE[a.level]}`}>
+                    {a.level}
+                  </span>
+                  <span className="font-medium text-ink">{a.title}</span>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-mute">{a.body}</p>
+              </div>
+              <button onClick={() => retract(a.id)} className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-medium text-mute hover:text-red-strong">
+                Retract
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

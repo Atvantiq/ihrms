@@ -340,6 +340,33 @@ export function fetchPlatformInsights(): Promise<PlatformInsights> {
   return apiGet<PlatformInsights>("/control-plane/insights");
 }
 
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  level: "info" | "success" | "warning";
+  created_at: string;
+}
+export function fetchAnnouncements(): Promise<Announcement[]> {
+  return apiGet<Announcement[]>("/control-plane/announcements");
+}
+export function postAnnouncement(body: {
+  title: string;
+  body: string;
+  level: string;
+}): Promise<Announcement> {
+  return apiPost<Announcement>("/control-plane/announcements", body);
+}
+export async function retractAnnouncement(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/control-plane/announcements/${id}`, {
+    method: "DELETE",
+    headers: { ...(await authHeader()) },
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Retract failed (${res.status})`);
+  }
+}
+
 // ----------------------------------------------------------------- reports
 
 export interface ReportMeta {
