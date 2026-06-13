@@ -1,5 +1,13 @@
 # RLS enforcement — app-role cutover runbook
 
+> **Status: DONE on the dev DB (2026-06-13).** The `ihrms_app` role exists with
+> the least-privilege grants below, `v_employee` is `security_invoker`, and the
+> app's `DATABASE_URL` points at `ihrms_app`. RLS is enforced (verified:
+> fail-closed without tenant, isolated across tenants, all endpoints pass).
+> **Migrations still run as the owner** (`postgres`) — `ihrms_app` has no DDL
+> rights and is subject to RLS, so run Alembic with the superuser `DATABASE_URL`,
+> not the app one. The steps below are retained for staging/production cutover.
+
 ## Why this is needed
 
 Migration `0006` adds tenant-isolation RLS policies + `FORCE ROW LEVEL SECURITY`
