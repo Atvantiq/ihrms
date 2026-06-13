@@ -898,6 +898,57 @@ export function onboardCandidate(
   return apiPost(`/recruitment/candidates/${cid}/onboard`, body);
 }
 
+// ---- interviews + scorecards
+
+export interface CandidateInterview {
+  id: string;
+  round: string;
+  scheduled_at: string | null;
+  recommendation: string | null;
+  feedback: string | null;
+}
+export function fetchCandidateInterviews(cid: string): Promise<CandidateInterview[]> {
+  return apiGet<CandidateInterview[]>(`/recruitment/candidates/${cid}/interviews`);
+}
+export function addCandidateInterview(cid: string, body: {
+  round: string;
+  recommendation?: "yes" | "no" | "maybe" | null;
+  feedback?: string | null;
+}): Promise<CandidateInterview> {
+  return apiPost<CandidateInterview>(`/recruitment/candidates/${cid}/interviews`, body);
+}
+export interface InterviewScore {
+  id: string;
+  interview_id: string;
+  criterion: string;
+  score: number;
+  comment: string | null;
+}
+export function addInterviewScore(
+  interviewId: string,
+  criterion: string,
+  score: number,
+): Promise<InterviewScore> {
+  return apiPost<InterviewScore>(`/recruitment/interviews/${interviewId}/scores`, {
+    criterion,
+    score,
+  });
+}
+export interface CriterionAgg {
+  criterion: string;
+  average: number;
+  count: number;
+}
+export interface Scorecard {
+  candidate_id: string;
+  criteria: CriterionAgg[];
+  overall: number;
+  total_scores: number;
+}
+export function fetchScorecard(cid: string): Promise<Scorecard> {
+  return apiGet<Scorecard>(`/recruitment/candidates/${cid}/scorecard`);
+}
+
 // ----------------------------------------------------------------- timesheet
 
 export interface Project {

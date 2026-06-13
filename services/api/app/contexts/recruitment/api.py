@@ -17,7 +17,7 @@ from app.contexts.identity.principal import (
     require_roles,
 )
 from app.contexts.payroll.salary import derive_structure
-from app.contexts.recruitment.service import can_transition
+from app.contexts.recruitment.service import aggregate_scorecard, can_transition
 from app.core.audit import record_audit
 from app.core.db import get_session
 
@@ -277,6 +277,116 @@ async def add_interview(
     out = InterviewOut(**dict(row))
     await session.commit()
     return out
+
+
+# ---------------------------------------------------------------- scorecards
+
+class ScoreIn(BaseModel):
+    criterion: str = Field(min_length=1, max_length=60)
+    score: int = Field(ge=1, le=5)
+    comment: str | None = None
+
+
+class ScoreOut(BaseModel):
+    id: str
+    interview_id: str
+    criterion: str
+    score: int
+    comment: str | None = None
+
+
+class CriterionAgg(BaseModel):
+    criterion: str
+    average: float
+    count: int
+
+
+class Scorecard(BaseModel):
+    candidate_id: str
+    criteria: list[CriterionAgg]
+    overall: float
+    total_scores: int
+
+
+async def _interview_belongs(session: AsyncSession, interview_id: str) -> None:
+    ok = (
+        await session.execute(
+            text("select 1 from ihrms.interview where id = cast(:id as uuid)"),
+            {"id": interview_id},
+        )
+    ).scalar()
+    if ok is None:
+        raise HTTPException(404, "Interview not found")
+
+
+@router.post(
+    "/interviews/{interview_id}/scores", response_model=ScoreOut, status_code=201
+)
+async def add_score(
+    interview_id: str,
+    payload: ScoreIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> ScoreOut:
+    await _interview_belongs(session, interview_id)
+    row = (
+        await session.execute(
+            text("""insert into ihrms.interview_score
+                    (interview_id, criterion, score, comment)
+                    values (cast(:i as uuid), :c, :s, :cm)
+                    returning id::text, interview_id::text, criterion, score, comment"""),
+            {"i": interview_id, "c": payload.criterion.strip(),
+             "s": payload.score, "cm": payload.comment},
+        )
+    ).mappings().one()
+    out = ScoreOut(**dict(row))
+    await session.commit()
+    return out
+
+
+@router.get("/interviews/{interview_id}/scores", response_model=list[ScoreOut])
+async def list_scores(
+    interview_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> list[ScoreOut]:
+    rows = (
+        await session.execute(
+            text("""select id::text, interview_id::text, criterion, score, comment
+                    from ihrms.interview_score where interview_id = cast(:i as uuid)
+                    order by created_at"""),
+            {"i": interview_id},
+        )
+    ).mappings().all()
+    return [ScoreOut(**dict(r)) for r in rows]
+
+
+@router.get("/candidates/{cid}/scorecard", response_model=Scorecard)
+async def candidate_scorecard(
+    cid: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> Scorecard:
+    """Aggregate all scores across the candidate's interviews."""
+    rows = (
+        await session.execute(
+            text("""select s.criterion, s.score
+                    from ihrms.interview_score s
+                    join ihrms.interview i on i.id = s.interview_id
+                    where i.candidate_id = cast(:c as uuid)"""),
+            {"c": cid},
+        )
+    ).mappings().all()
+    agg = aggregate_scorecard([(r["criterion"], r["score"]) for r in rows])
+    return Scorecard(
+        candidate_id=cid,
+        criteria=[
+            CriterionAgg(criterion=c.criterion, average=c.average, count=c.count)
+            for c in agg.criteria
+        ],
+        overall=agg.overall,
+        total_scores=agg.total_scores,
+    )
 
 
 # ---------------------------------------------------------------- offers

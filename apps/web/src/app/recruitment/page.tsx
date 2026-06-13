@@ -4,16 +4,142 @@ import { useCallback, useEffect, useState } from "react";
 import {
   acceptOffer,
   addCandidate,
+  addCandidateInterview,
+  addInterviewScore,
   createRequisition,
+  fetchCandidateInterviews,
   fetchCandidates,
   fetchRequisitions,
+  fetchScorecard,
   makeOffer,
   moveStage,
   onboardCandidate,
   type Candidate,
+  type CandidateInterview,
   type Requisition,
+  type Scorecard,
 } from "@/lib/api";
 import { Avatar } from "@/components/Avatar";
+
+const CRITERIA = ["Technical", "Communication", "Problem solving", "Culture fit"];
+
+function ScorecardPanel({ cid, onError }: { cid: string; onError: (m: string) => void }) {
+  const [interviews, setInterviews] = useState<CandidateInterview[]>([]);
+  const [card, setCard] = useState<Scorecard | null>(null);
+
+  const reload = useCallback(() => {
+    fetchCandidateInterviews(cid).then(setInterviews).catch((e) => onError(e.message));
+    fetchScorecard(cid).then(setCard).catch((e) => onError(e.message));
+  }, [cid, onError]);
+  useEffect(() => reload(), [reload]);
+
+  async function addRound(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await addCandidateInterview(cid, {
+        round: fd.get("round") as string,
+        recommendation: (fd.get("recommendation") as "yes" | "no" | "maybe") || null,
+      });
+      form.reset();
+      reload();
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
+
+  async function score(interviewId: string, criterion: string, value: number) {
+    try {
+      await addInterviewScore(interviewId, criterion, value);
+      reload();
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
+
+  return (
+    <div className="grid gap-4 rounded-lg border border-line bg-canvas p-3 lg:grid-cols-[1.5fr_1fr]">
+      <div>
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-mute">
+          Interviews &amp; scorecards
+        </div>
+        <div className="space-y-2">
+          {interviews.map((iv) => (
+            <div key={iv.id} className="rounded-lg border border-line-2 bg-surface p-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-ink">{iv.round}</span>
+                {iv.recommendation && (
+                  <span className={`text-[11px] font-medium ${
+                    iv.recommendation === "yes" ? "text-green-strong"
+                      : iv.recommendation === "no" ? "text-red-strong" : "text-warn-strong"
+                  }`}>
+                    {iv.recommendation}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {CRITERIA.map((crit) => (
+                  <span key={crit} className="flex items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[10px]">
+                    <span className="text-mute">{crit}</span>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => score(iv.id, crit, n)}
+                        className="text-mute-2 hover:text-amber"
+                        title={`${crit}: ${n}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+          {interviews.length === 0 && <p className="text-xs text-mute">No interviews yet.</p>}
+        </div>
+        <form onSubmit={addRound} className="mt-2 flex gap-2">
+          <input name="round" required placeholder="Round name" className="flex-1 rounded-lg border border-line px-2 py-1 text-xs" />
+          <select name="recommendation" defaultValue="" className="rounded-lg border border-line px-2 py-1 text-xs">
+            <option value="">rec…</option>
+            <option value="yes">yes</option>
+            <option value="maybe">maybe</option>
+            <option value="no">no</option>
+          </select>
+          <button className="rounded-lg border border-line px-2 py-1 text-xs text-mute hover:text-ink">Add round</button>
+        </form>
+      </div>
+
+      <div>
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-mute">
+          Aggregate scorecard
+        </div>
+        {card && card.total_scores > 0 ? (
+          <>
+            <div className="mb-2 flex items-baseline gap-2">
+              <span className="text-2xl font-semibold text-ink">{card.overall}</span>
+              <span className="text-[11px] text-mute">/ 5 · {card.total_scores} scores</span>
+            </div>
+            <div className="space-y-1.5">
+              {card.criteria.map((c) => (
+                <div key={c.criterion} className="flex items-center gap-2 text-[12px]">
+                  <span className="w-28 shrink-0 text-mute">{c.criterion}</span>
+                  <div className="h-3 flex-1 rounded bg-line-2">
+                    <div className="h-3 rounded bg-indigo" style={{ width: `${(c.average / 5) * 100}%` }} />
+                  </div>
+                  <span className="w-8 text-right font-mono text-ink">{c.average}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-mute">No scores yet — rate criteria on the left.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 const STAGE_STYLE: Record<string, string> = {
@@ -39,6 +165,7 @@ function CandidateRow({
   onChanged: () => void;
   onError: (m: string) => void;
 }) {
+  const [showCard, setShowCard] = useState(false);
   async function advance(stage: string) {
     try {
       await moveStage(c.id, stage);
@@ -92,6 +219,7 @@ function CandidateRow({
     c.stage === "applied" ? "screening" : c.stage === "screening" ? "interview" : null;
 
   return (
+    <>
     <tr className="border-b border-line-2 last:border-0">
       <td className="px-4 py-2">
         <div className="flex items-center gap-2.5">
@@ -115,6 +243,9 @@ function CandidateRow({
       </td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-wrap justify-end gap-1.5">
+          <button onClick={() => setShowCard(!showCard)} className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink">
+            {showCard ? "Hide" : "Scorecard"}
+          </button>
           {nextStage && (
             <button onClick={() => advance(nextStage)} className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink">
               → {nextStage}
@@ -148,6 +279,14 @@ function CandidateRow({
         </div>
       </td>
     </tr>
+    {showCard && (
+      <tr className="border-b border-line-2">
+        <td colSpan={5} className="px-4 pb-3">
+          <ScorecardPanel cid={c.id} onError={onError} />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 
