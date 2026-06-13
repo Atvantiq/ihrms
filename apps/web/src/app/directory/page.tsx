@@ -89,30 +89,14 @@ export default function DirectoryPage() {
               : "Loading directory…"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {isHr && (
           <Link
-            href="/leave"
-            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
+            href="/directory/new"
+            className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
           >
-            Leave
+            + Add employee
           </Link>
-          {isHr && (
-            <>
-              <Link
-                href="/settings/org"
-                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
-              >
-                ⚙ Org masters
-              </Link>
-              <Link
-                href="/directory/new"
-                className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
-              >
-                + Add employee
-              </Link>
-            </>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Filter bar */}

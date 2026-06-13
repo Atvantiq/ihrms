@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchMe } from "@/lib/api";
+import { Sidebar } from "@/components/Sidebar";
 import { supabase } from "@/lib/supabase";
 
-/** Client-side guard: renders children only with an active Supabase session. */
+/** Client-side guard + app shell: renders the sidebar + topbar around
+ *  authenticated pages, redirecting to /login without a session. */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [isHr, setIsHr] = useState(false);
 
   useEffect(() => {
     supabase()
@@ -19,6 +23,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         } else {
           setEmail(data.session.user.email ?? null);
           setReady(true);
+          fetchMe()
+            .then((me) => setIsHr(me.is_hr))
+            .catch(() => {});
         }
       });
   }, [router]);
@@ -36,25 +43,27 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
 
   return (
-    <>
-      <header className="flex items-center justify-between border-b border-line bg-surface px-6 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="ai-gradient h-6 w-6 rounded-md" />
-          <span className="text-sm font-semibold text-ink">
-            Atvantiq People
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-mute">{email}</span>
-          <button
-            onClick={signOut}
-            className="rounded-lg border border-line px-2.5 py-1 text-xs text-mute hover:text-ink"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-      {children}
-    </>
+    <div className="flex h-screen w-full overflow-hidden">
+      <Sidebar isHr={isHr} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-end border-b border-line bg-surface px-6 py-2.5">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-mute">{email}</span>
+            {isHr && (
+              <span className="rounded bg-indigo-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase text-indigo-strong">
+                HR
+              </span>
+            )}
+            <button
+              onClick={signOut}
+              className="rounded-lg border border-line px-2.5 py-1 text-xs text-mute hover:text-ink"
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
+      </div>
+    </div>
   );
 }

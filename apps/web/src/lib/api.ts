@@ -379,6 +379,30 @@ export function addHoliday(
   return apiPost<Holiday>("/holidays", { name, holiday_date, type });
 }
 
+// ----------------------------------------------------------------- audit
+
+export interface AuditEvent {
+  id: string;
+  actor_email: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string | null;
+  changes: Record<string, unknown>;
+  request_id: string | null;
+  created_at: string;
+}
+
+export function fetchAuditEvents(params: {
+  entity_type?: string;
+  limit?: number;
+} = {}): Promise<AuditEvent[]> {
+  const qs = new URLSearchParams();
+  if (params.entity_type) qs.set("entity_type", params.entity_type);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return apiGet<AuditEvent[]>(`/audit/events${qs.size ? `?${qs}` : ""}`);
+}
+
 export async function deleteHoliday(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/holidays/${id}`, {
     method: "DELETE",
