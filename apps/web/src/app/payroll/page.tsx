@@ -341,6 +341,25 @@ export default function PayrollPage() {
                       >
                         Bank file
                       </button>
+                      {([
+                        ["ecr", "ECR", "txt"],
+                        ["esi", "ESI", "csv"],
+                        ["pt", "PT", "csv"],
+                      ] as const).map(([path, label, ext]) => (
+                        <button
+                          key={path}
+                          title={`${label} return file`}
+                          onClick={() =>
+                            downloadFile(
+                              `/payroll/runs/${r.id}/${path}`,
+                              `${path}_${MONTHS[r.period_month - 1]}${r.period_year}.${ext}`,
+                            )
+                          }
+                          className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink"
+                        >
+                          {label}
+                        </button>
+                      ))}
                       {r.status === "draft" && (
                         <button
                           onClick={() => finalize(r.id)}

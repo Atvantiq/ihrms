@@ -11,7 +11,9 @@ import {
   fetchEmployeePayslips,
   fetchLeaveBalances,
   fetchMe,
+  fetchStatutoryIds,
   fetchStructure,
+  setStatutoryIds,
   type Advance,
   type Asset,
   type ConsentLine,
@@ -19,6 +21,7 @@ import {
   type HistoryEntry,
   type LeaveBalance,
   type Payslip,
+  type StatutoryIds,
   type StructureSaved,
 } from "@/lib/api";
 
@@ -86,6 +89,8 @@ export default function ProfilePage({
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [consent, setConsent] = useState<ConsentLine[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [statutory, setStatutory] = useState<StatutoryIds | null>(null);
+  const [statMsg, setStatMsg] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -101,6 +106,7 @@ export default function ProfilePage({
           fetchEmployeeAdvances(empIdNum).then(setAdvances).catch(() => {});
           fetchConsent(empIdNum).then(setConsent).catch(() => {});
           fetchEmployeeHistory(empIdNum).then(setHistory).catch(() => {});
+          fetchStatutoryIds(empIdNum).then(setStatutory).catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
@@ -321,6 +327,60 @@ export default function ProfilePage({
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {emp.pii_visible && statutory && (
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <h2 className="mb-1 text-sm font-semibold text-ink">Statutory IDs</h2>
+          <p className="mb-4 text-[11px] text-mute">
+            UAN, ESIC &amp; PF — used to generate the PF ECR / ESI / PT return files.
+          </p>
+          {statMsg && <div className="mb-3 text-xs text-green-strong">{statMsg}</div>}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              try {
+                const saved = await setStatutoryIds(empIdNum, {
+                  uan: (fd.get("uan") as string) || null,
+                  esic_ip: (fd.get("esic_ip") as string) || null,
+                  pf_number: (fd.get("pf_number") as string) || null,
+                  pt_state: (fd.get("pt_state") as string) || "KA",
+                });
+                setStatutory(saved);
+                setStatMsg("Saved");
+                setTimeout(() => setStatMsg(null), 2500);
+              } catch (err) {
+                setError((err as Error).message);
+              }
+            }}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+          >
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-mute">
+              UAN
+              <input name="uan" defaultValue={statutory.uan ?? ""} disabled={!isHr} placeholder="12 digits" className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case text-ink disabled:bg-line-2/40" />
+            </label>
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-mute">
+              ESIC IP
+              <input name="esic_ip" defaultValue={statutory.esic_ip ?? ""} disabled={!isHr} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case text-ink disabled:bg-line-2/40" />
+            </label>
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-mute">
+              PF number
+              <input name="pf_number" defaultValue={statutory.pf_number ?? ""} disabled={!isHr} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal normal-case text-ink disabled:bg-line-2/40" />
+            </label>
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-mute">
+              PT state
+              <input name="pt_state" defaultValue={statutory.pt_state} disabled={!isHr} maxLength={2} className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm font-normal uppercase text-ink disabled:bg-line-2/40" />
+            </label>
+            {isHr && (
+              <div className="col-span-2 sm:col-span-4">
+                <button className="rounded-lg bg-ink px-4 py-1.5 text-xs font-medium text-surface hover:bg-ink-2">
+                  Save IDs
+                </button>
+              </div>
+            )}
+          </form>
         </section>
       )}
 

@@ -850,6 +850,23 @@ export function fetchStructure(employeeId: number): Promise<StructureSaved> {
   return apiGet<StructureSaved>(`/payroll/structures/${employeeId}`);
 }
 
+export interface StatutoryIds {
+  employee_id: number;
+  uan: string | null;
+  pf_number: string | null;
+  esic_ip: string | null;
+  pt_state: string;
+}
+export function fetchStatutoryIds(employeeId: number): Promise<StatutoryIds> {
+  return apiGet<StatutoryIds>(`/payroll/statutory/${employeeId}`);
+}
+export function setStatutoryIds(
+  employeeId: number,
+  body: { uan?: string | null; pf_number?: string | null; esic_ip?: string | null; pt_state: string },
+): Promise<StatutoryIds> {
+  return apiPut<StatutoryIds>(`/payroll/statutory/${employeeId}`, body);
+}
+
 export function fetchEmployeePayslips(employeeId: number): Promise<Payslip[]> {
   return apiGet<Payslip[]>(`/payroll/payslips/${employeeId}`);
 }

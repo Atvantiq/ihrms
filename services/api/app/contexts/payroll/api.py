@@ -22,13 +22,14 @@ from app.contexts.identity.principal import (
 )
 from app.contexts.payroll.outputs import gl_journal, statutory_totals
 from app.contexts.payroll.pdf import payslip_pdf
+from app.contexts.payroll.returns import Member, ecr_file, esi_file, pt_file
 from app.contexts.payroll.salary import SalaryStructure, compute_payslip, derive_structure
 from app.contexts.payroll.statutory import DEFAULT_RATES, StatutoryRates, rates_from_pack
 from app.contexts.payroll.tds import monthly_tds
 from app.core.audit import record_audit
 from app.core.db import get_session
 from app.core.money import D
-from app.core.validators import validate_ifsc
+from app.core.validators import validate_ifsc, validate_uan
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -550,6 +551,142 @@ async def run_bankfile(
         content="\n".join(out) + "\n", media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="bankfile_{run_id[:8]}.csv"'},
     )
+
+
+# ---------------------------------------------------------------- statutory IDs
+
+class StatutoryIdsIn(BaseModel):
+    uan: str | None = None
+    pf_number: str | None = None
+    esic_ip: str | None = None
+    pt_state: str = "KA"
+
+    @field_validator("uan")
+    @classmethod
+    def _uan(cls, v: str | None) -> str | None:
+        return None if not (v and v.strip()) else validate_uan(v)
+
+
+class StatutoryIdsOut(StatutoryIdsIn):
+    employee_id: int
+
+
+@router.get("/statutory/{employee_id}", response_model=StatutoryIdsOut)
+async def get_statutory(
+    employee_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> StatutoryIdsOut:
+    if employee_id != principal.employee_id and not principal.is_hr:
+        raise HTTPException(403, "You can only view your own statutory IDs")
+    row = (
+        await session.execute(
+            text("""select uan, pf_number, esic_ip, pt_state
+                    from ihrms.employee_statutory where employee_id = :e"""),
+            {"e": employee_id},
+        )
+    ).mappings().first()
+    if row is None:
+        return StatutoryIdsOut(employee_id=employee_id)
+    return StatutoryIdsOut(employee_id=employee_id, **dict(row))
+
+
+@router.put("/statutory/{employee_id}", response_model=StatutoryIdsOut)
+async def set_statutory(
+    employee_id: int,
+    payload: StatutoryIdsIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> StatutoryIdsOut:
+    await session.execute(
+        text("""insert into ihrms.employee_statutory
+                (employee_id, uan, pf_number, esic_ip, pt_state, updated_by)
+                values (:e, :u, :pf, :ip, :st, :by)
+                on conflict (tenant_id, employee_id) do update set
+                  uan=:u, pf_number=:pf, esic_ip=:ip, pt_state=:st,
+                  updated_by=:by, updated_at=now()"""),
+        {"e": employee_id, "u": payload.uan, "pf": payload.pf_number,
+         "ip": payload.esic_ip, "st": payload.pt_state, "by": principal.employee_id},
+    )
+    await record_audit(
+        session, principal, "statutory.set", "employee", str(employee_id),
+        summary="Updated statutory identifiers",
+    )
+    await session.commit()
+    return StatutoryIdsOut(employee_id=employee_id, **payload.model_dump())
+
+
+# ---------------------------------------------------------------- return files
+
+async def _run_members(session: AsyncSession, run_id: str) -> list[Member]:
+    rows = (
+        await session.execute(
+            text("""select p.employee_id, e.employee_code,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm,
+                       p.earnings, p.gross, p.lop_days,
+                       r.working_days, s.uan, s.esic_ip,
+                       coalesce(s.pt_state, 'KA') as pt_state
+                    from ihrms.payslip p
+                    join ihrms.payroll_run r on r.id = p.run_id
+                    left join public.employees e on e.employee_id = p.employee_id
+                    left join ihrms.employee_statutory s on s.employee_id = p.employee_id
+                    where p.run_id = :run order by nm"""),
+            {"run": run_id},
+        )
+    ).mappings().all()
+    members: list[Member] = []
+    for r in rows:
+        earnings = r["earnings"] if isinstance(r["earnings"], dict) else json.loads(r["earnings"])
+        members.append(
+            Member(
+                employee_code=r["employee_code"] or str(r["employee_id"]),
+                name=r["nm"] or "—", uan=r["uan"], esic_ip=r["esic_ip"],
+                pt_state=r["pt_state"], gross=Decimal(str(r["gross"])),
+                basic=Decimal(str(earnings.get("basic", 0))),
+                working_days=int(r["working_days"]), lop_days=Decimal(str(r["lop_days"])),
+            )
+        )
+    return members
+
+
+def _file_response(content: str, name: str, media: str) -> Response:
+    return Response(
+        content=content, media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
+
+
+@router.get("/runs/{run_id}/ecr")
+async def run_ecr(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> Response:
+    members = await _run_members(session, run_id)
+    rates = await _active_rates(session)
+    return _file_response(ecr_file(members, rates=rates), f"ecr_{run_id[:8]}.txt", "text/plain")
+
+
+@router.get("/runs/{run_id}/esi")
+async def run_esi(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> Response:
+    members = await _run_members(session, run_id)
+    rates = await _active_rates(session)
+    return _file_response(esi_file(members, rates=rates), f"esi_{run_id[:8]}.csv", "text/csv")
+
+
+@router.get("/runs/{run_id}/pt")
+async def run_pt(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> Response:
+    members = await _run_members(session, run_id)
+    rates = await _active_rates(session)
+    return _file_response(pt_file(members, rates=rates), f"pt_{run_id[:8]}.csv", "text/csv")
 
 
 @router.post("/runs/{run_id}/mark-paid", response_model=RunOut)
