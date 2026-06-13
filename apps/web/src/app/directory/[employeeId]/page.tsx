@@ -2,9 +2,28 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchEmployee, fetchMe, type EmployeeDetail } from "@/lib/api";
+import {
+  fetchEmployee,
+  fetchEmployeePayslips,
+  fetchLeaveBalances,
+  fetchMe,
+  fetchStructure,
+  type EmployeeDetail,
+  type LeaveBalance,
+  type Payslip,
+  type StructureSaved,
+} from "@/lib/api";
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
+
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function inr(v: string | number): string {
+  return "₹" + Number(v).toLocaleString("en-IN");
+}
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -32,18 +51,31 @@ export default function ProfilePage({
   params: Promise<{ employeeId: string }>;
 }) {
   const { employeeId } = use(params);
+  const empIdNum = Number(employeeId);
   const [emp, setEmp] = useState<EmployeeDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isHr, setIsHr] = useState(false);
+  const [structure, setStructure] = useState<StructureSaved | null>(null);
+  const [balances, setBalances] = useState<LeaveBalance[]>([]);
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
 
   useEffect(() => {
     fetchEmployee(employeeId)
-      .then(setEmp)
+      .then((e) => {
+        setEmp(e);
+        // The "360" cross-module sections are sensitive — only load them when
+        // the viewer is HR or the employee themselves (same gate as PII).
+        if (e.pii_visible) {
+          fetchStructure(empIdNum).then(setStructure).catch(() => setStructure(null));
+          fetchLeaveBalances(empIdNum).then(setBalances).catch(() => {});
+          fetchEmployeePayslips(empIdNum).then(setPayslips).catch(() => {});
+        }
+      })
       .catch((e: Error) => setError(e.message));
     fetchMe()
       .then((me) => setIsHr(me.is_hr))
       .catch(() => {});
-  }, [employeeId]);
+  }, [employeeId, empIdNum]);
 
   if (error)
     return (
@@ -132,6 +164,68 @@ export default function ProfilePage({
         <div className="rounded-xl border border-line bg-line-2/50 p-4 text-xs text-mute">
           🔒 Personal details are visible to HR and the employee only.
         </div>
+      )}
+
+      {emp.pii_visible && structure && (
+        <Section title="Compensation">
+          <Field label="Annual CTC" value={inr(structure.ctc_annual)} />
+          <Field label="Monthly gross" value={inr(structure.gross_monthly)} />
+          <Field label="Basic" value={inr(structure.basic)} />
+          <Field label="HRA" value={inr(structure.hra)} />
+          <Field label="Special allowance" value={inr(structure.special_allowance)} />
+          <Field label="Tax regime" value={`${structure.tax_regime} regime`} />
+        </Section>
+      )}
+
+      {emp.pii_visible && balances.length > 0 && (
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold text-ink">Leave balances</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {balances.map((b) => (
+              <div key={b.leave_type_id} className="rounded-lg border border-line-2 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-mute">
+                    {b.label}
+                  </span>
+                  <span className="font-mono text-[10px] text-mute-2">{b.code}</span>
+                </div>
+                <div className="mt-1 text-xl font-semibold text-ink">
+                  {Number(b.available)}
+                  <span className="text-[10px] font-normal text-mute"> avail</span>
+                </div>
+                <div className="text-[10px] text-mute-2">
+                  {Number(b.used)} used · {Number(b.pending)} pending
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {emp.pii_visible && payslips.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <h2 className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">
+            Recent payslips
+          </h2>
+          <div className="divide-y divide-line-2">
+            {payslips.slice(0, 6).map((p) => (
+              <div
+                key={`${p.period_year}-${p.period_month}`}
+                className="flex items-center justify-between px-5 py-2.5 text-sm"
+              >
+                <span className="text-ink">
+                  {MONTHS[p.period_month - 1]} {p.period_year}
+                </span>
+                <span className="flex items-center gap-4">
+                  <span className="text-[11px] text-mute">
+                    gross {inr(p.gross)} · ded {inr(p.total_deductions)}
+                  </span>
+                  <span className="font-semibold text-ink">{inr(p.net_pay)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

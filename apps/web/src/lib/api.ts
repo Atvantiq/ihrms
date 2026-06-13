@@ -799,6 +799,14 @@ export function previewStructure(ctcAnnual: number): Promise<StructurePreview> {
   return apiGet<StructurePreview>(`/payroll/preview?ctc_annual=${ctcAnnual}`);
 }
 
+export function fetchStructure(employeeId: number): Promise<StructureSaved> {
+  return apiGet<StructureSaved>(`/payroll/structures/${employeeId}`);
+}
+
+export function fetchEmployeePayslips(employeeId: number): Promise<Payslip[]> {
+  return apiGet<Payslip[]>(`/payroll/payslips/${employeeId}`);
+}
+
 export async function setStructure(
   employeeId: number,
   ctcAnnual: number,
