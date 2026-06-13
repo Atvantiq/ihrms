@@ -45,6 +45,12 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    label: "Lifecycle",
+    items: [
+      { label: "Exit & F&F", href: "/exit", icon: "↗", hrOnly: true },
+    ],
+  },
+  {
     label: "Admin",
     items: [
       { label: "Audit log", href: "/settings/audit", icon: "❒", hrOnly: true },

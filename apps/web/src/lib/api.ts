@@ -264,6 +264,63 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- exit / F&F
+
+export interface ClearanceItem {
+  id: string;
+  item: string;
+  status: string;
+  note: string | null;
+}
+
+export interface FnFSettlement {
+  pending_salary: string;
+  gratuity: string;
+  leave_encashment: string;
+  notice_recovery: string;
+  other_recoveries: string;
+  net_settlement: string;
+  status: string;
+}
+
+export interface ExitCase {
+  id: string;
+  employee_id: number;
+  employee_name: string;
+  resignation_date: string;
+  last_working_day: string;
+  reason: string | null;
+  notice_required_days: number;
+  status: string;
+  clearance: ClearanceItem[];
+  fnf: FnFSettlement | null;
+}
+
+export function fetchExitCases(): Promise<ExitCase[]> {
+  return apiGet<ExitCase[]>("/exit/cases");
+}
+export function initiateExit(body: {
+  employee_id: number;
+  resignation_date: string;
+  last_working_day: string;
+  reason?: string;
+  notice_required_days: number;
+}): Promise<ExitCase> {
+  return apiPost<ExitCase>("/exit/cases", body);
+}
+export function clearItem(caseId: string, itemId: string): Promise<ExitCase> {
+  return apiPost<ExitCase>(`/exit/cases/${caseId}/clearance/${itemId}`, {});
+}
+export function computeFnf(caseId: string): Promise<ExitCase> {
+  return apiPost<ExitCase>(`/exit/cases/${caseId}/compute-fnf`, {});
+}
+export function approveFnf(caseId: string): Promise<ExitCase> {
+  return apiPost<ExitCase>(`/exit/cases/${caseId}/fnf/approve`, {});
+}
+export function payFnf(caseId: string): Promise<ExitCase> {
+  return apiPost<ExitCase>(`/exit/cases/${caseId}/fnf/pay`, {});
+}
+
 // ----------------------------------------------------------------- performance
 
 export interface ReviewCycle {
