@@ -4,10 +4,12 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   fetchEmployee,
+  fetchEmployeeAssets,
   fetchEmployeePayslips,
   fetchLeaveBalances,
   fetchMe,
   fetchStructure,
+  type Asset,
   type EmployeeDetail,
   type LeaveBalance,
   type Payslip,
@@ -58,6 +60,7 @@ export default function ProfilePage({
   const [structure, setStructure] = useState<StructureSaved | null>(null);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -69,6 +72,7 @@ export default function ProfilePage({
           fetchStructure(empIdNum).then(setStructure).catch(() => setStructure(null));
           fetchLeaveBalances(empIdNum).then(setBalances).catch(() => {});
           fetchEmployeePayslips(empIdNum).then(setPayslips).catch(() => {});
+          fetchEmployeeAssets(empIdNum).then(setAssets).catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
@@ -222,6 +226,25 @@ export default function ProfilePage({
                   </span>
                   <span className="font-semibold text-ink">{inr(p.net_pay)}</span>
                 </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {emp.pii_visible && assets.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <h2 className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">
+            Assets held
+          </h2>
+          <div className="divide-y divide-line-2">
+            {assets.map((a) => (
+              <div key={a.id} className="flex items-center justify-between px-5 py-2.5 text-sm">
+                <span className="text-ink">
+                  {a.name}
+                  <span className="ml-2 font-mono text-[10px] text-mute">{a.asset_tag}</span>
+                </span>
+                <span className="text-[11px] capitalize text-mute">{a.category}</span>
               </div>
             ))}
           </div>

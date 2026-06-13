@@ -6,10 +6,13 @@ import {
   clearItem,
   computeFnf,
   downloadFile,
+  fetchEmployeeAssets,
   fetchEmployees,
   fetchExitCases,
   initiateExit,
   payFnf,
+  returnAsset,
+  type Asset,
   type EmployeeListItem,
   type ExitCase,
 } from "@/lib/api";
@@ -27,10 +30,25 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 function CaseCard({ c, onChanged, onError }: { c: ExitCase; onChanged: () => void; onError: (m: string) => void }) {
+  const [assets, setAssets] = useState<Asset[]>([]);
+
+  const loadAssets = useCallback(() => {
+    fetchEmployeeAssets(c.employee_id).then(setAssets).catch(() => {});
+  }, [c.employee_id]);
+  useEffect(() => loadAssets(), [loadAssets]);
+
   async function act(fn: () => Promise<unknown>) {
     try {
       await fn();
       onChanged();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+  async function recover(assetId: string) {
+    try {
+      await returnAsset(assetId);
+      loadAssets();
     } catch (e) {
       onError((e as Error).message);
     }
@@ -95,6 +113,33 @@ function CaseCard({ c, onChanged, onError }: { c: ExitCase; onChanged: () => voi
           )}
         </div>
       </div>
+
+      {assets.length > 0 && (
+        <div className="border-t border-line px-4 py-3">
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-mute">
+            Assets to recover
+            <span className="rounded-full bg-warn-soft px-1.5 py-0.5 text-[9px] text-warn-strong">
+              {assets.length} outstanding
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {assets.map((a) => (
+              <div key={a.id} className="flex items-center justify-between text-sm">
+                <span className="text-ink">
+                  {a.name}
+                  <span className="ml-2 font-mono text-[10px] text-mute">{a.asset_tag}</span>
+                </span>
+                <button
+                  onClick={() => recover(a.id)}
+                  className="rounded-md border border-line px-2 py-0.5 text-[10px] text-mute hover:text-ink"
+                >
+                  Mark returned
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-line px-4 py-2.5">
         {c.status === "clearance" && (
