@@ -26,7 +26,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/directory");
+    router.push("/dashboard");
   }
 
   async function devSignIn() {
@@ -43,7 +43,7 @@ export default function LoginPage() {
         refresh_token: s.refresh_token,
       });
       if (error) throw error;
-      router.push("/directory");
+      router.push("/dashboard");
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);

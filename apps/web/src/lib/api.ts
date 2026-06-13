@@ -264,6 +264,31 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- dashboard
+
+export interface DashboardSummary {
+  headcount: {
+    total: number;
+    active: number;
+    probation: number;
+    joining: number;
+    notice: number;
+    inactive: number;
+  };
+  on_leave_today: { employee_name: string; leave_code: string; end_date: string }[];
+  my_pending_approvals: number;
+  new_joiners: {
+    full_name: string;
+    designation: string | null;
+    date_of_joining: string;
+  }[];
+  upcoming_holidays: { name: string; holiday_date: string }[];
+}
+
+export function fetchDashboard(): Promise<DashboardSummary> {
+  return apiGet<DashboardSummary>("/dashboard");
+}
+
 // ----------------------------------------------------------------- leave
 
 export interface LeaveType {
