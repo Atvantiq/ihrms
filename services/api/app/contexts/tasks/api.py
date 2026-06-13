@@ -26,7 +26,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 class Task(BaseModel):
     """One actionable approval, normalised across modules."""
 
-    task_type: Literal["leave", "timesheet", "increment"]
+    task_type: Literal["leave", "timesheet", "increment", "regularization"]
     ref_id: str
     employee_id: int
     employee_name: str
@@ -112,6 +112,37 @@ async def list_tasks(
                 subtitle=f"Week of {r['week_start']}",
                 badge="hrs",
                 week_of=r["week_start"],
+            )
+        )
+
+    # --- attendance regularizations (HR: org; manager: reports) -----------
+    reg_where = "r.status = 'pending' and r.employee_id != :me"
+    if not is_hr:
+        reg_where += (
+            " and r.employee_id in (select employee_id from public.job_details"
+            " where reporting_manager = :me and is_active = 1)"
+        )
+    reg_rows = (
+        await session.execute(
+            text(f"""select r.id::text, r.employee_id, r.work_date, r.requested_status,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.attendance_regularization r
+                    left join public.employees e on e.employee_id = r.employee_id
+                    where {reg_where}
+                    order by r.work_date"""),
+            {"me": me},
+        )
+    ).mappings().all()
+    for r in reg_rows:
+        tasks.append(
+            Task(
+                task_type="regularization",
+                ref_id=r["id"],
+                employee_id=r["employee_id"],
+                employee_name=r["nm"] or "—",
+                title=f"Regularize · {r['requested_status']}",
+                subtitle=f"For {r['work_date']}",
+                badge="att",
             )
         )
 

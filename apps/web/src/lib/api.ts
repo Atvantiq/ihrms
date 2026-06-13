@@ -754,6 +754,39 @@ export function markAttendance(
   });
 }
 
+export interface Regularization {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  work_date: string;
+  requested_status: "present" | "wfh";
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  decision_note: string | null;
+}
+
+export function fetchRegularizations(
+  scope: "mine" | "pending" = "mine",
+): Promise<Regularization[]> {
+  return apiGet<Regularization[]>(`/attendance/regularizations?scope=${scope}`);
+}
+export function requestRegularization(body: {
+  work_date: string;
+  requested_status: "present" | "wfh";
+  reason: string;
+}): Promise<Regularization> {
+  return apiPost<Regularization>("/attendance/regularizations", body);
+}
+export function decideRegularization(
+  id: string,
+  action: "approve" | "reject",
+  note?: string,
+): Promise<Regularization> {
+  return apiPost<Regularization>(`/attendance/regularizations/${id}/${action}`, {
+    note: note ?? null,
+  });
+}
+
 // ----------------------------------------------------------------- payroll
 
 export interface StructurePreview {
@@ -933,7 +966,7 @@ export function fetchPulseInbox(): Promise<PulseDecision[]> {
 }
 
 export interface Task {
-  task_type: "leave" | "timesheet" | "increment";
+  task_type: "leave" | "timesheet" | "increment" | "regularization";
   ref_id: string;
   employee_id: number;
   employee_name: string;

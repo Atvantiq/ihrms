@@ -96,6 +96,39 @@ async def inbox(
             )
         )
 
+    # 2b) Attendance regularizations waiting on me.
+    if is_hr:
+        reg_pending = await _scalar(
+            session,
+            """select count(*) from ihrms.attendance_regularization
+               where status='pending' and employee_id != :me""",
+            me=me,
+        )
+    else:
+        reg_pending = await _scalar(
+            session,
+            """select count(*) from ihrms.attendance_regularization r
+               where r.status='pending' and r.employee_id != :me
+                 and r.employee_id in (
+                   select employee_id from public.job_details
+                   where reporting_manager = :me and is_active = 1)""",
+            me=me,
+        )
+    if reg_pending:
+        decisions.append(
+            Decision(
+                kind="regularization_approvals",
+                severity=severity_for_count(reg_pending, high_at=8),
+                icon="⏱",
+                title=f"{reg_pending} attendance fix"
+                f"{'es' if reg_pending != 1 else ''} to review",
+                detail="Regularization requests awaiting your decision.",
+                action_label="Review",
+                action_href="/tasks",
+                count=reg_pending,
+            )
+        )
+
     # The remaining signals are HR/platform decisions.
     if is_hr:
         # 3) Increment proposals awaiting approval.

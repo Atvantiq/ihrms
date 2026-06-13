@@ -5,10 +5,19 @@ import {
   fetchAttendance,
   fetchEmployees,
   fetchMe,
+  fetchRegularizations,
   markAttendance,
+  requestRegularization,
   type AttendanceSummary,
   type EmployeeListItem,
+  type Regularization,
 } from "@/lib/api";
+
+const REG_STATUS_STYLE: Record<Regularization["status"], string> = {
+  pending: "bg-warn-soft text-warn-strong",
+  approved: "bg-green-soft text-green-strong",
+  rejected: "bg-red-soft text-red-strong",
+};
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -48,6 +57,7 @@ export default function AttendancePage() {
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
   const [empId, setEmpId] = useState<number | null>(null);
   const [data, setData] = useState<AttendanceSummary | null>(null);
+  const [regs, setRegs] = useState<Regularization[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +76,28 @@ export default function AttendancePage() {
   }, [year, month, empId]);
 
   useEffect(reload, [reload]);
+
+  const loadRegs = useCallback(() => {
+    fetchRegularizations("mine").then(setRegs).catch(() => {});
+  }, []);
+  useEffect(loadRegs, [loadRegs]);
+
+  async function submitReg(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await requestRegularization({
+        work_date: fd.get("work_date") as string,
+        requested_status: fd.get("requested_status") as "present" | "wfh",
+        reason: fd.get("reason") as string,
+      });
+      form.reset();
+      loadRegs();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   async function cycle(day: string, current: string) {
     if (!empId || !me) return;
@@ -177,6 +209,41 @@ export default function AttendancePage() {
               Click a working day to cycle Present → Absent → WFH. Leave and
               holidays are managed in their own screens.
             </p>
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+              Regularization requests
+              <span className="ml-2 font-normal text-mute">
+                fix a missing or wrong day — needs manager approval
+              </span>
+            </div>
+            <form onSubmit={submitReg} className="flex flex-wrap items-end gap-3 border-b border-line-2 p-4">
+              <input name="work_date" type="date" required className="rounded-lg border border-line px-2 py-2 text-sm text-mute" />
+              <select name="requested_status" className="rounded-lg border border-line px-2 py-2 text-sm">
+                <option value="present">Present</option>
+                <option value="wfh">WFH</option>
+              </select>
+              <input name="reason" required maxLength={300} placeholder="Reason" className="min-w-48 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+              <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Request</button>
+            </form>
+            <div className="divide-y divide-line-2">
+              {regs.length === 0 && (
+                <p className="px-4 py-3 text-sm text-mute">No regularization requests.</p>
+              )}
+              {regs.map((r) => (
+                <div key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-ink">
+                    {r.work_date}
+                    <span className="ml-2 text-[11px] capitalize text-mute">{r.requested_status}</span>
+                    <span className="ml-2 text-[11px] text-mute-2">{r.reason}</span>
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${REG_STATUS_STYLE[r.status]}`}>
+                    {r.status}
+                  </span>
+                </div>
+              ))}
+            </div>
           </section>
         </>
       )}

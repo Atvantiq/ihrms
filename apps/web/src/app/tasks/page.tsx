@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   approveIncrement,
   decideLeave,
+  decideRegularization,
   decideWeek,
   fetchTasks,
   type Task,
@@ -14,9 +15,10 @@ const TYPE_META: Record<Task["task_type"], { label: string; tone: string }> = {
   leave: { label: "Leave", tone: "bg-indigo-soft text-indigo-strong" },
   timesheet: { label: "Timesheet", tone: "bg-blue-soft text-blue-strong" },
   increment: { label: "Increment", tone: "bg-green-soft text-green-strong" },
+  regularization: { label: "Attendance", tone: "bg-warn-soft text-warn-strong" },
 };
 
-const ORDER: Task["task_type"][] = ["leave", "timesheet", "increment"];
+const ORDER: Task["task_type"][] = ["leave", "timesheet", "regularization", "increment"];
 
 function taskKey(t: Task): string {
   return `${t.task_type}:${t.ref_id}`;
@@ -45,6 +47,8 @@ export default function TasksPage() {
         await decideWeek(action, t.employee_id, t.week_of ?? "");
       } else if (t.task_type === "increment" && action === "approve") {
         await approveIncrement(t.ref_id);
+      } else if (t.task_type === "regularization") {
+        await decideRegularization(t.ref_id, action);
       }
       reload();
     } catch (e) {
