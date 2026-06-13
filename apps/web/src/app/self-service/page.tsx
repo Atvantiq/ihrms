@@ -16,6 +16,7 @@ import {
   fetchMyCheckIns,
   fileClaim,
   logCheckIn,
+  raiseAssetRequest,
   type AttendanceSummary,
   type CheckIn,
   type Claim,
@@ -91,6 +92,7 @@ export default function SelfServicePage() {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [claimCats, setClaimCats] = useState<string[]>([]);
+  const [assetMsg, setAssetMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -136,6 +138,19 @@ export default function SelfServicePage() {
       setConsent(await decideConsent(purpose, grant));
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+  async function submitAssetRequest(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      await raiseAssetRequest(fd.get("category") as string, fd.get("justification") as string);
+      form.reset();
+      setAssetMsg("Request submitted to HR.");
+      setTimeout(() => setAssetMsg(null), 3000);
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
   async function submitCheckIn(e: React.FormEvent<HTMLFormElement>) {
@@ -331,6 +346,27 @@ export default function SelfServicePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="border-b border-line px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">Request an asset</h2>
+          <p className="text-[11px] text-mute">Ask HR for equipment — they&apos;ll review and allocate from stock.</p>
+        </div>
+        {assetMsg && (
+          <div className="border-b border-line-2 bg-green-soft/40 px-4 py-2 text-xs text-green-strong">
+            {assetMsg}
+          </div>
+        )}
+        <form onSubmit={submitAssetRequest} className="flex flex-wrap items-end gap-3 p-4">
+          <select name="category" defaultValue="laptop" className="rounded-lg border border-line px-2 py-2 text-sm capitalize">
+            {["laptop", "desktop", "phone", "monitor", "peripheral", "furniture", "other"].map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <input name="justification" required maxLength={500} placeholder="Why do you need it?" className="min-w-44 flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-surface">Request</button>
+        </form>
       </section>
 
       <section className="rounded-xl border border-line bg-surface shadow-sm">

@@ -2,15 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  addMaintenance,
+  approveAssetRequest,
   assignAsset,
   createAsset,
+  fetchAssetRequests,
   fetchAssets,
   fetchDepreciation,
   fetchEmployees,
+  fetchMaintenance,
+  rejectAssetRequest,
   returnAsset,
   type Asset,
+  type AssetRequest,
   type DepreciationReport,
   type EmployeeListItem,
+  type Maintenance,
 } from "@/lib/api";
 
 const STATUS_STYLE: Record<Asset["status"], string> = {
@@ -27,6 +34,181 @@ function inr(v: string | number | null): string {
   return "₹" + Number(v).toLocaleString("en-IN");
 }
 
+function RequestsPanel({
+  stock,
+  onError,
+  onChanged,
+}: {
+  stock: Asset[];
+  onError: (m: string) => void;
+  onChanged: () => void;
+}) {
+  const [reqs, setReqs] = useState<AssetRequest[]>([]);
+  const load = useCallback(() => {
+    fetchAssetRequests("all").then(setReqs).catch((e) => onError(e.message));
+  }, [onError]);
+  useEffect(() => load(), [load]);
+
+  async function approve(r: AssetRequest, assetId: string) {
+    try {
+      await approveAssetRequest(r.id, assetId || undefined);
+      load();
+      onChanged();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+  async function reject(r: AssetRequest) {
+    try {
+      await rejectAssetRequest(r.id);
+      load();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+
+  const STATUS: Record<string, string> = {
+    pending: "bg-warn-soft text-warn-strong",
+    approved: "bg-blue-soft text-blue-strong",
+    fulfilled: "bg-green-soft text-green-strong",
+    rejected: "bg-red-soft text-red-strong",
+  };
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+        Asset requests <span className="font-normal text-mute">({reqs.length})</span>
+      </div>
+      <table className="w-full text-left text-sm">
+        <tbody>
+          {reqs.map((r) => {
+            const matching = stock.filter((a) => a.category === r.category);
+            return (
+              <tr key={r.id} className="border-b border-line-2 last:border-0">
+                <td className="px-4 py-2">
+                  <span className="text-ink">{r.employee_name ?? r.employee_id}</span>
+                  <span className="ml-2 text-[11px] capitalize text-mute">{r.category}</span>
+                  <span className="ml-2 text-[11px] text-mute-2">{r.justification}</span>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS[r.status]}`}>
+                    {r.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {r.status === "pending" && (
+                    <span className="flex items-center justify-end gap-2">
+                      <select
+                        defaultValue=""
+                        onChange={(e) => e.target.value && approve(r, e.target.value)}
+                        className="rounded-md border border-line px-2 py-1 text-[11px]"
+                      >
+                        <option value="">Approve + allocate…</option>
+                        <option value="__none__" disabled>
+                          {matching.length} in stock
+                        </option>
+                        {matching.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.asset_tag} · {a.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => approve(r, "")}
+                        className="rounded-md bg-blue-soft px-2 py-1 text-[11px] font-medium text-blue-strong"
+                      >
+                        Approve only
+                      </button>
+                      <button
+                        onClick={() => reject(r)}
+                        className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-red-strong"
+                      >
+                        Reject
+                      </button>
+                    </span>
+                  )}
+                  {r.status !== "pending" && r.decision_note && (
+                    <span className="text-[11px] text-mute">{r.decision_note}</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          {reqs.length === 0 && (
+            <tr>
+              <td className="px-4 py-8 text-center text-sm text-mute">No asset requests.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function MaintenancePanel({ asset, onError }: { asset: Asset; onError: (m: string) => void }) {
+  const [log, setLog] = useState<Maintenance[]>([]);
+  const load = useCallback(() => {
+    fetchMaintenance(asset.id).then(setLog).catch((e) => onError(e.message));
+  }, [asset.id, onError]);
+  useEffect(() => load(), [load]);
+
+  async function add(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    try {
+      await addMaintenance(asset.id, {
+        kind: fd.get("kind") as string,
+        performed_on: fd.get("performed_on") as string,
+        cost: (fd.get("cost") as string) || "0",
+        vendor: (fd.get("vendor") as string) || null,
+        note: (fd.get("note") as string) || null,
+      });
+      e.currentTarget.reset();
+      load();
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
+        Maintenance · {asset.name}{" "}
+        <span className="font-mono text-[11px] text-mute">{asset.asset_tag}</span>
+      </div>
+      <form onSubmit={add} className="flex flex-wrap items-end gap-2 border-b border-line bg-canvas p-3">
+        <select name="kind" defaultValue="service" className="rounded-lg border border-line px-2 py-1.5 text-sm capitalize">
+          {["service", "repair", "upgrade", "inspection"].map((k) => (
+            <option key={k} value={k}>{k}</option>
+          ))}
+        </select>
+        <input name="performed_on" type="date" required className="rounded-lg border border-line px-2 py-1.5 text-sm" />
+        <input name="cost" type="number" min="0" step="1" placeholder="Cost ₹" className="w-24 rounded-lg border border-line px-2 py-1.5 text-sm" />
+        <input name="vendor" placeholder="Vendor" className="rounded-lg border border-line px-2 py-1.5 text-sm" />
+        <input name="note" placeholder="Note" className="min-w-32 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm" />
+        <button className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface">Log</button>
+      </form>
+      <div className="divide-y divide-line-2">
+        {log.map((m) => (
+          <div key={m.id} className="flex items-center justify-between px-4 py-2 text-sm">
+            <span className="text-ink capitalize">
+              {m.kind}
+              {m.vendor && <span className="ml-2 text-[11px] text-mute">{m.vendor}</span>}
+              {m.note && <span className="ml-2 text-[11px] text-mute-2">{m.note}</span>}
+            </span>
+            <span className="text-[11px] text-mute">
+              {m.performed_on} · <span className="font-semibold text-ink">{inr(m.cost)}</span>
+            </span>
+          </div>
+        ))}
+        {log.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm text-mute">No maintenance logged.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
@@ -35,6 +217,8 @@ export default function AssetsPage() {
   const [assigning, setAssigning] = useState<string | null>(null);
   const [dep, setDep] = useState<DepreciationReport | null>(null);
   const [showDep, setShowDep] = useState(false);
+  const [showReqs, setShowReqs] = useState(false);
+  const [maintaining, setMaintaining] = useState<Asset | null>(null);
 
   const reload = useCallback(() => {
     fetchAssets().then(setAssets).catch((e) => setError(e.message));
@@ -100,6 +284,12 @@ export default function AssetsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowReqs(!showReqs)}
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
+          >
+            {showReqs ? "Hide" : "Requests"}
+          </button>
+          <button
             onClick={() => setShowDep(!showDep)}
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
           >
@@ -155,6 +345,16 @@ export default function AssetsPage() {
           {error} <button onClick={() => setError(null)} className="underline">dismiss</button>
         </div>
       )}
+
+      {showReqs && (
+        <RequestsPanel
+          stock={assets.filter((a) => a.status === "in_stock")}
+          onError={setError}
+          onChanged={reload}
+        />
+      )}
+
+      {maintaining && <MaintenancePanel asset={maintaining} onError={setError} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
@@ -252,6 +452,12 @@ export default function AssetsPage() {
                       Return
                     </button>
                   )}
+                  <button
+                    onClick={() => setMaintaining(maintaining?.id === a.id ? null : a)}
+                    className="ml-1 rounded-md border border-line px-2 py-1 text-[11px] font-medium text-mute hover:text-ink"
+                  >
+                    🔧
+                  </button>
                 </td>
               </tr>
             ))}

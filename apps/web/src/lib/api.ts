@@ -1749,6 +1749,61 @@ export function returnAsset(
   });
 }
 
+// ---- asset depth: requests + maintenance
+
+export interface AssetRequest {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  category: string;
+  justification: string;
+  status: "pending" | "approved" | "rejected" | "fulfilled";
+  allocated_asset_id: string | null;
+  decision_note: string | null;
+}
+export function fetchAssetRequests(
+  scope: "mine" | "pending" | "all" = "mine",
+): Promise<AssetRequest[]> {
+  return apiGet<AssetRequest[]>(`/assets/requests?scope=${scope}`);
+}
+export function raiseAssetRequest(category: string, justification: string): Promise<AssetRequest> {
+  return apiPost<AssetRequest>("/assets/requests", { category, justification });
+}
+export function approveAssetRequest(
+  id: string,
+  assetId?: string,
+  note?: string,
+): Promise<AssetRequest> {
+  return apiPost<AssetRequest>(`/assets/requests/${id}/approve`, {
+    asset_id: assetId ?? null,
+    note: note ?? null,
+  });
+}
+export function rejectAssetRequest(id: string, note?: string): Promise<AssetRequest> {
+  return apiPost<AssetRequest>(`/assets/requests/${id}/reject`, { note: note ?? null });
+}
+
+export interface Maintenance {
+  id: string;
+  kind: "service" | "repair" | "upgrade" | "inspection";
+  performed_on: string;
+  cost: string;
+  vendor: string | null;
+  note: string | null;
+}
+export function fetchMaintenance(assetId: string): Promise<Maintenance[]> {
+  return apiGet<Maintenance[]>(`/assets/${assetId}/maintenance`);
+}
+export function addMaintenance(assetId: string, body: {
+  kind: string;
+  performed_on: string;
+  cost: string;
+  vendor?: string | null;
+  note?: string | null;
+}): Promise<Maintenance> {
+  return apiPost<Maintenance>(`/assets/${assetId}/maintenance`, body);
+}
+
 // ----------------------------------------------------------------- advances
 
 export interface Advance {

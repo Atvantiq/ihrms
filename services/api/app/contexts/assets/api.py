@@ -294,3 +294,239 @@ async def return_asset(
     result = _to_out(dict(out), date.today())
     await session.commit()
     return result
+
+
+# ============================================================ asset requests
+
+class AssetRequestOut(BaseModel):
+    id: str
+    employee_id: int
+    employee_name: str | None = None
+    category: str
+    justification: str
+    status: str
+    allocated_asset_id: str | None = None
+    decision_note: str | None = None
+
+
+class AssetRequestIn(BaseModel):
+    category: Category
+    justification: str = Field(min_length=1, max_length=500)
+
+
+class ApproveRequestIn(BaseModel):
+    asset_id: str | None = None  # optional: allocate this in-stock asset now
+    note: str | None = None
+
+
+_REQ_SELECT = """
+    select r.id::text, r.employee_id, r.category, r.justification, r.status,
+           r.allocated_asset_id::text as allocated_asset_id, r.decision_note,
+           trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as employee_name
+    from ihrms.asset_request r
+    left join public.employees e on e.employee_id = r.employee_id
+"""
+
+
+def _req_out(r: dict[str, Any]) -> AssetRequestOut:
+    return AssetRequestOut(
+        id=r["id"], employee_id=r["employee_id"], employee_name=r["employee_name"] or None,
+        category=r["category"], justification=r["justification"], status=r["status"],
+        allocated_asset_id=r["allocated_asset_id"], decision_note=r["decision_note"],
+    )
+
+
+@router.get("/requests", response_model=list[AssetRequestOut])
+async def list_requests(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    scope: Literal["mine", "pending", "all"] = "mine",
+) -> list[AssetRequestOut]:
+    if scope != "mine" and not principal.is_hr:
+        raise HTTPException(403, "HR only")
+    where, params = "", {}
+    if scope == "mine":
+        where, params = " where r.employee_id = :me", {"me": principal.employee_id}
+    elif scope == "pending":
+        where = " where r.status = 'pending'"
+    rows = (
+        await session.execute(
+            text(_REQ_SELECT + where + " order by r.created_at desc"), params
+        )
+    ).mappings().all()
+    return [_req_out(dict(r)) for r in rows]
+
+
+@router.post("/requests", response_model=AssetRequestOut, status_code=201)
+async def raise_request(
+    payload: AssetRequestIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> AssetRequestOut:
+    row = (
+        await session.execute(
+            text("""insert into ihrms.asset_request (employee_id, category, justification)
+                    values (:e, :c, :j) returning id::text"""),
+            {"e": principal.employee_id, "c": payload.category, "j": payload.justification},
+        )
+    ).scalar_one()
+    out = _req_out(dict(
+        (await session.execute(text(_REQ_SELECT + " where r.id = :id"),
+                               {"id": row})).mappings().one()
+    ))
+    await session.commit()
+    return out
+
+
+@router.post("/requests/{request_id}/approve", response_model=AssetRequestOut)
+async def approve_request(
+    request_id: str,
+    payload: ApproveRequestIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> AssetRequestOut:
+    req = (
+        await session.execute(
+            text("""select employee_id, status from ihrms.asset_request
+                    where id = cast(:id as uuid)"""),
+            {"id": request_id},
+        )
+    ).mappings().first()
+    if req is None:
+        raise HTTPException(404, "Request not found")
+    if req["status"] != "pending":
+        raise HTTPException(409, f"Request already {req['status']}")
+
+    new_status = "approved"
+    if payload.asset_id:
+        asset = (
+            await session.execute(
+                text("select status from ihrms.asset where id = cast(:id as uuid)"),
+                {"id": payload.asset_id},
+            )
+        ).mappings().first()
+        if asset is None:
+            raise HTTPException(404, "Asset to allocate not found")
+        if not can_assign(asset["status"]):
+            raise HTTPException(409, f"Asset is {asset['status']}, cannot allocate")
+        await session.execute(
+            text("""insert into ihrms.asset_assignment (asset_id, employee_id, note)
+                    values (cast(:a as uuid), :e, 'Allocated via asset request')"""),
+            {"a": payload.asset_id, "e": req["employee_id"]},
+        )
+        await session.execute(
+            text("update ihrms.asset set status='assigned', updated_at=now() "
+                 "where id=cast(:id as uuid)"),
+            {"id": payload.asset_id},
+        )
+        new_status = "fulfilled"
+
+    await session.execute(
+        text("""update ihrms.asset_request
+                set status=:s, allocated_asset_id=cast(:a as uuid), decision_note=:n,
+                    decided_by=:by, updated_at=now()
+                where id = cast(:id as uuid)"""),
+        {"s": new_status, "a": payload.asset_id, "n": payload.note,
+         "by": principal.employee_id, "id": request_id},
+    )
+    await record_audit(session, principal, "asset_request.approve", "asset_request",
+                       request_id, summary=f"Request {new_status} for {req['employee_id']}")
+    out = _req_out(dict(
+        (await session.execute(text(_REQ_SELECT + " where r.id = cast(:id as uuid)"),
+                               {"id": request_id})).mappings().one()
+    ))
+    await session.commit()
+    return out
+
+
+@router.post("/requests/{request_id}/reject", response_model=AssetRequestOut)
+async def reject_request(
+    request_id: str,
+    payload: ReturnIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> AssetRequestOut:
+    res = await session.execute(
+        text("""update ihrms.asset_request set status='rejected', decision_note=:n,
+                decided_by=:by, updated_at=now()
+                where id = cast(:id as uuid) and status='pending'
+                returning id::text"""),
+        {"n": payload.note, "by": principal.employee_id, "id": request_id},
+    )
+    if res.scalar() is None:
+        raise HTTPException(409, "Request not found or not pending")
+    out = _req_out(dict(
+        (await session.execute(text(_REQ_SELECT + " where r.id = cast(:id as uuid)"),
+                               {"id": request_id})).mappings().one()
+    ))
+    await session.commit()
+    return out
+
+
+# ========================================================== asset maintenance
+
+class MaintenanceOut(BaseModel):
+    id: str
+    kind: str
+    performed_on: date
+    cost: Decimal
+    vendor: str | None = None
+    note: str | None = None
+
+
+class MaintenanceIn(BaseModel):
+    kind: Literal["service", "repair", "upgrade", "inspection"] = "service"
+    performed_on: date
+    cost: Decimal = Field(default=D(0), ge=0)
+    vendor: str | None = None
+    note: str | None = None
+
+
+@router.get("/{asset_id}/maintenance", response_model=list[MaintenanceOut])
+async def list_maintenance(
+    asset_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> list[MaintenanceOut]:
+    rows = (
+        await session.execute(
+            text("""select id::text, kind, performed_on, cost, vendor, note
+                    from ihrms.asset_maintenance where asset_id = cast(:id as uuid)
+                    order by performed_on desc"""),
+            {"id": asset_id},
+        )
+    ).mappings().all()
+    return [MaintenanceOut(**dict(r)) for r in rows]
+
+
+@router.post("/{asset_id}/maintenance", response_model=MaintenanceOut, status_code=201)
+async def add_maintenance(
+    asset_id: str,
+    payload: MaintenanceIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> MaintenanceOut:
+    exists = (
+        await session.execute(
+            text("select 1 from ihrms.asset where id = cast(:id as uuid)"),
+            {"id": asset_id},
+        )
+    ).scalar()
+    if exists is None:
+        raise HTTPException(404, "Asset not found")
+    row = (
+        await session.execute(
+            text("""insert into ihrms.asset_maintenance
+                    (asset_id, kind, performed_on, cost, vendor, note, created_by)
+                    values (cast(:a as uuid), :k, :on, :cost, :v, :n, :by)
+                    returning id::text, kind, performed_on, cost, vendor, note"""),
+            {"a": asset_id, "k": payload.kind, "on": payload.performed_on,
+             "cost": payload.cost, "v": payload.vendor, "n": payload.note,
+             "by": principal.employee_id},
+        )
+    ).mappings().one()
+    await record_audit(session, principal, "asset_maintenance.add", "asset",
+                       asset_id, summary=f"{payload.kind} logged (cost {payload.cost})")
+    out = MaintenanceOut(**dict(row))
+    await session.commit()
+    return out
