@@ -1,11 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV } from "@/components/nav";
+import { fetchTasks } from "@/lib/api";
 
 export function Sidebar({ isHr, isSuper }: { isHr: boolean; isSuper: boolean }) {
   const pathname = usePathname();
+  const [taskCount, setTaskCount] = useState(0);
+
+  useEffect(() => {
+    fetchTasks()
+      .then((t) => setTaskCount(t.length))
+      .catch(() => {});
+  }, [pathname]); // refresh the badge after acting on tasks
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-surface">
@@ -60,7 +69,12 @@ export function Sidebar({ isHr, isSuper }: { isHr: boolean; isSuper: boolean }) 
                     }`}
                   >
                     <span className="w-4 text-center">{item.icon}</span>
-                    <span>{item.label}</span>
+                    <span className="flex-1">{item.label}</span>
+                    {item.href === "/tasks" && taskCount > 0 && (
+                      <span className="rounded-full bg-red px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                        {taskCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
