@@ -275,6 +275,15 @@ export function fetchEmployeeHistory(employeeId: number): Promise<HistoryEntry[]
   return apiGet<HistoryEntry[]>(`/employees/${employeeId}/history`);
 }
 
+export interface LetterType {
+  key: string;
+  label: string;
+  needs_ctc: boolean;
+}
+export function fetchLetterTypes(): Promise<LetterType[]> {
+  return apiGet<LetterType[]>("/letters/types");
+}
+
 export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }

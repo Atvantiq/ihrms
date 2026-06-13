@@ -16,6 +16,7 @@ from app.contexts.identity.api import router as me_router
 from app.contexts.identity.dev_login import router as dev_login_router
 from app.contexts.leave.api import router as leave_router
 from app.contexts.leave.holidays import router as holidays_router
+from app.contexts.letters.api import router as letters_router
 from app.contexts.org.api import router as org_router
 from app.contexts.overtime.api import router as overtime_router
 from app.contexts.payroll.api import router as payroll_router
@@ -41,6 +42,7 @@ api_router.include_router(shifts_router)
 api_router.include_router(overtime_router)
 api_router.include_router(comp_off_router)
 api_router.include_router(feedback_router)
+api_router.include_router(letters_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

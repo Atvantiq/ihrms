@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  downloadFile,
   fetchConsent,
   fetchEmployee,
   fetchEmployeeAdvances,
@@ -10,6 +11,7 @@ import {
   fetchEmployeeHistory,
   fetchEmployeePayslips,
   fetchLeaveBalances,
+  fetchLetterTypes,
   fetchMe,
   fetchStatutoryIds,
   fetchStructure,
@@ -20,6 +22,7 @@ import {
   type EmployeeDetail,
   type HistoryEntry,
   type LeaveBalance,
+  type LetterType,
   type Payslip,
   type StatutoryIds,
   type StructureSaved,
@@ -91,6 +94,7 @@ export default function ProfilePage({
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [statutory, setStatutory] = useState<StatutoryIds | null>(null);
   const [statMsg, setStatMsg] = useState<string | null>(null);
+  const [letterTypes, setLetterTypes] = useState<LetterType[]>([]);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -111,7 +115,10 @@ export default function ProfilePage({
       })
       .catch((e: Error) => setError(e.message));
     fetchMe()
-      .then((me) => setIsHr(me.is_hr))
+      .then((me) => {
+        setIsHr(me.is_hr);
+        if (me.is_hr) fetchLetterTypes().then(setLetterTypes).catch(() => {});
+      })
       .catch(() => {});
   }, [employeeId, empIdNum]);
 
@@ -325,6 +332,28 @@ export default function ProfilePage({
                   {c.status.replace("_", " ")}
                 </span>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {isHr && letterTypes.length > 0 && (
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <h2 className="mb-1 text-sm font-semibold text-ink">Letters</h2>
+          <p className="mb-3 text-[11px] text-mute">
+            Generate a signed-on-behalf HR letter as a PDF.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {letterTypes.map((lt) => (
+              <button
+                key={lt.key}
+                onClick={() =>
+                  downloadFile(`/letters/${lt.key}/${empIdNum}`, `${lt.key}_${empIdNum}.pdf`)
+                }
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-line-2"
+              >
+                {lt.label}
+              </button>
             ))}
           </div>
         </section>
