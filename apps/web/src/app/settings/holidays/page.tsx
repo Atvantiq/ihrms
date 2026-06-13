@@ -65,7 +65,7 @@ export default function HolidaysPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 p-6">
+    <div className="space-y-4">
       <div>
         <Link href="/leave" className="text-xs text-mute hover:text-ink">
           ← Leave
@@ -207,6 +207,6 @@ export default function HolidaysPage() {
           </tbody>
         </table>
       </section>
-    </main>
+    </div>
   );
 }

@@ -62,7 +62,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
-        <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
+        {/* Standard content canvas — the SINGLE source of truth for content
+            width + padding (prototype `.canvas`: full-width 1fr, padding
+            18/22px). Pages must NOT set their own mx-auto/max-w/padding. */}
+        <main className="flex-1 overflow-y-auto px-6 py-5">{children}</main>
       </div>
     </div>
   );

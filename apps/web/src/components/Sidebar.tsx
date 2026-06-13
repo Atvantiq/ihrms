@@ -8,7 +8,7 @@ export function Sidebar({ isHr }: { isHr: boolean }) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-surface">
+    <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-surface">
       <div className="flex items-center gap-2 px-4 py-3.5">
         <div className="ai-gradient h-6 w-6 rounded-md" />
         <span className="text-sm font-semibold text-ink">Atvantiq People</span>

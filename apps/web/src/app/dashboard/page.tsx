@@ -58,7 +58,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-6">
+    <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold text-ink">Dashboard</h1>
         <p className="text-xs text-mute">Your organisation at a glance</p>
@@ -181,6 +181,6 @@ export default function DashboardPage() {
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

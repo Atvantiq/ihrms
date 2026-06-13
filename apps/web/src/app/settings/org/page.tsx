@@ -240,7 +240,7 @@ export default function OrgMastersPage() {
   useEffect(reload, [reload]);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 p-6">
+    <div className="space-y-4">
       <div>
         <Link href="/directory" className="text-xs text-mute hover:text-ink">
           ← Back to People
@@ -268,6 +268,6 @@ export default function OrgMastersPage() {
           onChanged={reload}
         />
       ))}
-    </main>
+    </div>
   );
 }

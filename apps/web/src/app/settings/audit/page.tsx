@@ -39,7 +39,7 @@ export default function AuditPage() {
   }, [entity]);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 p-6">
+    <div className="space-y-4">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold text-ink">Audit log</h1>
@@ -103,6 +103,6 @@ export default function AuditPage() {
           </tbody>
         </table>
       </section>
-    </main>
+    </div>
   );
 }

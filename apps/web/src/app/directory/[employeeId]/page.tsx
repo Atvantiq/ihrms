@@ -47,21 +47,21 @@ export default function ProfilePage({
 
   if (error)
     return (
-      <main className="mx-auto w-full max-w-4xl flex-1 p-6">
+      <div>
         <div className="rounded-xl border border-red-soft bg-red-soft/50 p-4 text-sm text-red-strong">
           {error}
         </div>
-      </main>
+      </div>
     );
   if (!emp)
     return (
-      <main className="mx-auto w-full max-w-4xl flex-1 p-6 text-sm text-mute">
+      <div className="text-sm text-mute">
         Loading profile…
-      </main>
+      </div>
     );
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 space-y-4 p-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Link href="/directory" className="text-xs text-mute hover:text-ink">
           ← Back to People
@@ -77,7 +77,7 @@ export default function ProfilePage({
       </div>
 
       {/* Header card */}
-      <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-6 shadow-md">
+      <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface shadow-md">
         <Avatar name={emp.full_name} size={56} />
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -133,6 +133,6 @@ export default function ProfilePage({
           🔒 Personal details are visible to HR and the employee only.
         </div>
       )}
-    </main>
+    </div>
   );
 }

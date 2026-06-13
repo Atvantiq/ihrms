@@ -82,7 +82,7 @@ export default function AddEmployeePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 p-6">
+    <div>
       <Link href="/directory" className="text-xs text-mute hover:text-ink">
         ← Back to People
       </Link>
@@ -187,6 +187,6 @@ export default function AddEmployeePage() {
           </button>
         </div>
       </form>
-    </main>
+    </div>
   );
 }

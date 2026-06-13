@@ -101,13 +101,13 @@ export default function EditEmployeePage({
 
   if (!emp)
     return (
-      <main className="mx-auto w-full max-w-3xl flex-1 p-6 text-sm text-mute">
+      <div className="text-sm text-mute">
         {error ?? "Loading…"}
-      </main>
+      </div>
     );
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 p-6">
+    <div>
       <Link href={`/directory/${employeeId}`} className="text-xs text-mute hover:text-ink">
         ← Back to profile
       </Link>
@@ -263,6 +263,6 @@ export default function EditEmployeePage({
           </button>
         </div>
       </form>
-    </main>
+    </div>
   );
 }

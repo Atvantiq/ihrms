@@ -310,7 +310,7 @@ export default function LeavePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 p-6">
+    <div className="space-y-4">
       <div className="flex items-end justify-between">
         <div>
           <Link href="/directory" className="text-xs text-mute hover:text-ink">
@@ -371,6 +371,6 @@ export default function LeavePage() {
         onAction={onAction}
         empty="You haven't applied for any leave yet."
       />
-    </main>
+    </div>
   );
 }

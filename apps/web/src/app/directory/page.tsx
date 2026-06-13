@@ -78,7 +78,7 @@ export default function DirectoryPage() {
   const pageCount = Math.max(1, Math.ceil(totalMatches / PAGE_SIZE));
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 p-6">
+    <div>
       {/* Page head */}
       <div className="mb-4 flex items-end justify-between">
         <div>
@@ -262,6 +262,6 @@ export default function DirectoryPage() {
           )}
         </div>
       )}
-    </main>
+    </div>
   );
 }
