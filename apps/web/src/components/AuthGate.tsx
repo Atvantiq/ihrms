@@ -14,6 +14,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [isHr, setIsHr] = useState(false);
+  const [isSuper, setIsSuper] = useState(false);
   const [persona, setPersona] = useState("employee");
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           fetchMe()
             .then((me) => {
               setIsHr(me.is_hr);
+              setIsSuper(me.roles.includes("super_admin"));
               setPersona(me.persona);
             })
             .catch(() => {});
@@ -49,7 +51,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <Sidebar isHr={isHr} />
+      <Sidebar isHr={isHr} isSuper={isSuper} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar email={email} persona={persona} onSignOut={signOut} />
         {/* Standard content canvas — the SINGLE source of truth for content

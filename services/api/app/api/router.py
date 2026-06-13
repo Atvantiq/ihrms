@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.health import router as health_router
 from app.contexts.attendance.api import router as attendance_router
 from app.contexts.audit.api import router as audit_router
+from app.contexts.control_plane.api import router as control_plane_router
 from app.contexts.core_hr.api import router as employees_router
 from app.contexts.dashboard.api import router as dashboard_router
 from app.contexts.exit_fnf.api import router as exit_router
@@ -31,6 +32,7 @@ api_router.include_router(timesheet_router)
 api_router.include_router(recruitment_router)
 api_router.include_router(performance_router)
 api_router.include_router(reports_router)
+api_router.include_router(control_plane_router)
 api_router.include_router(exit_router)
 api_router.include_router(audit_router)
 api_router.include_router(dev_login_router)

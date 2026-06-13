@@ -3,6 +3,7 @@ export interface NavItem {
   href: string;
   icon: string;
   hrOnly?: boolean;
+  superOnly?: boolean;
   comingSoon?: boolean;
 }
 
@@ -55,6 +56,12 @@ export const NAV: NavSection[] = [
     label: "Admin",
     items: [
       { label: "Audit log", href: "/settings/audit", icon: "❒", hrOnly: true },
+    ],
+  },
+  {
+    label: "Control Plane",
+    items: [
+      { label: "Tenants & Billing", href: "/control-plane", icon: "⬡", superOnly: true },
     ],
   },
 ];

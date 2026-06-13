@@ -264,6 +264,82 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- control plane
+
+export interface Plan {
+  code: string;
+  name: string;
+  price_per_employee: string;
+  included_employees: number;
+  features: Record<string, unknown>;
+}
+export interface Tenant {
+  id: string;
+  name: string;
+  plan_code: string | null;
+  status: string;
+  region: string;
+  employee_count: number;
+  mrr: string;
+}
+export interface Invoice {
+  id: string;
+  tenant_id: string;
+  period_year: number;
+  period_month: number;
+  employee_count: number;
+  rate: string;
+  amount: string;
+  status: string;
+}
+export interface StatutoryPack {
+  id: string;
+  name: string;
+  country: string;
+  effective_from: string;
+  rates: Record<string, unknown>;
+  is_active: boolean;
+}
+export interface PlatformInsights {
+  tenants: number;
+  active_tenants: number;
+  billable_employees: number;
+  mrr: string;
+}
+
+export function fetchPlans(): Promise<Plan[]> {
+  return apiGet<Plan[]>("/control-plane/plans");
+}
+export function fetchTenants(): Promise<Tenant[]> {
+  return apiGet<Tenant[]>("/control-plane/tenants");
+}
+export function createTenant(body: {
+  id: string;
+  name: string;
+  plan_code: string;
+  region?: string;
+}): Promise<Tenant> {
+  return apiPost<Tenant>("/control-plane/tenants", body);
+}
+export function setTenantStatus(id: string, status: string): Promise<Tenant> {
+  return apiPatch<Tenant>(`/control-plane/tenants/${id}`, { status });
+}
+export function runBilling(year: number, month: number): Promise<Invoice[]> {
+  return apiPost<Invoice[]>("/control-plane/billing/run", {
+    period_year: year,
+    period_month: month,
+  });
+}
+export function fetchInvoices(): Promise<Invoice[]> {
+  return apiGet<Invoice[]>("/control-plane/invoices");
+}
+export function fetchStatutoryPacks(): Promise<StatutoryPack[]> {
+  return apiGet<StatutoryPack[]>("/control-plane/statutory-packs");
+}
+export function fetchPlatformInsights(): Promise<PlatformInsights> {
+  return apiGet<PlatformInsights>("/control-plane/insights");
+}
+
 // ----------------------------------------------------------------- reports
 
 export interface ReportMeta {

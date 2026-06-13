@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV } from "@/components/nav";
 
-export function Sidebar({ isHr }: { isHr: boolean }) {
+export function Sidebar({ isHr, isSuper }: { isHr: boolean; isSuper: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -21,7 +21,9 @@ export function Sidebar({ isHr }: { isHr: boolean }) {
 
       <nav className="flex-1 overflow-y-auto px-2 pb-4">
         {NAV.map((section) => {
-          const items = section.items.filter((i) => !i.hrOnly || isHr);
+          const items = section.items.filter(
+            (i) => (!i.hrOnly || isHr) && (!i.superOnly || isSuper),
+          );
           if (items.length === 0) return null;
           return (
             <div key={section.label} className="mb-3">
