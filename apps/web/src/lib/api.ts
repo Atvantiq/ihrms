@@ -1003,6 +1003,41 @@ export function returnAsset(
   });
 }
 
+// ----------------------------------------------------------------- advances
+
+export interface Advance {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  kind: "advance" | "loan";
+  principal_amount: string;
+  emi_amount: string;
+  outstanding: string;
+  recovered: string;
+  reason: string | null;
+  status: "active" | "closed" | "cancelled";
+  disbursed_on: string;
+}
+
+export function fetchAdvances(): Promise<Advance[]> {
+  return apiGet<Advance[]>("/advances");
+}
+export function fetchEmployeeAdvances(employeeId: number): Promise<Advance[]> {
+  return apiGet<Advance[]>(`/advances/employee/${employeeId}`);
+}
+export function issueAdvance(body: {
+  employee_id: number;
+  kind: string;
+  principal_amount: string;
+  emi_amount: string;
+  reason?: string | null;
+}): Promise<Advance> {
+  return apiPost<Advance>("/advances", body);
+}
+export function cancelAdvance(id: string): Promise<Advance> {
+  return apiPost<Advance>(`/advances/${id}/cancel`, {});
+}
+
 // ----------------------------------------------------------------- leave
 
 export interface LeaveType {

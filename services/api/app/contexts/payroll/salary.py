@@ -61,11 +61,13 @@ def compute_payslip(
     working_days: int = 30,
     lop_days: Decimal = ZERO,
     declared_tds: Money = ZERO,
+    loan_recovery: Money = ZERO,
     rates: StatutoryRates = DEFAULT_RATES,
 ) -> Payslip:
     """Compute one month's payslip from a structure, with loss-of-pay
     proration. PF is on (prorated) basic; ESI/PT on prorated gross. Rates
-    come from the tenant's active statutory pack (defaults to FY25-26)."""
+    come from the tenant's active statutory pack (defaults to FY25-26).
+    `loan_recovery` (if any) is deducted as an advance/loan EMI."""
     if lop_days < 0 or lop_days > working_days:
         raise ValueError("lop_days must be between 0 and working_days")
 
@@ -84,6 +86,8 @@ def compute_payslip(
         deductions["esi_employee"] = esi.employee
     if declared_tds > 0:
         deductions["tds"] = declared_tds
+    if loan_recovery > 0:
+        deductions["loan_recovery"] = loan_recovery
 
     total_deductions = sum(deductions.values(), D(0))
     net_pay = gross - total_deductions

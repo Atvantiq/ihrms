@@ -223,10 +223,21 @@ async def compute(
 
     notice_served = (case.last_working_day - case.resignation_date).days
 
+    # outstanding advances/loans are recovered in full at settlement
+    advances_due = (
+        await session.execute(
+            text("""select coalesce(sum(outstanding), 0) from ihrms.advance
+                    where employee_id = :emp and status = 'active'"""),
+            {"emp": case.employee_id},
+        )
+    ).scalar()
+    other_recoveries = max(Decimal(str(advances_due or 0)), D(0))
+
     f = compute_fnf(
         last_basic=basic, monthly_gross=gross, doj=doj, lwd=case.last_working_day,
         unused_leave_days=unused_days, pending_salary=pending,
         notice_required_days=case.notice_required_days, notice_served_days=notice_served,
+        other_recoveries=other_recoveries,
     )
     await session.execute(
         text("""insert into ihrms.fnf_settlement
@@ -312,6 +323,25 @@ async def pay_fnf(
         text("update ihrms.salary_structure set is_active=false where employee_id=:emp"),
         {"emp": case.employee_id},
     )
+    # settle any outstanding advances in full (recovered via the F&F)
+    open_advances = (
+        await session.execute(
+            text("""select id::text, outstanding from ihrms.advance
+                    where employee_id=:emp and status='active' and outstanding > 0"""),
+            {"emp": case.employee_id},
+        )
+    ).mappings().all()
+    for adv in open_advances:
+        await session.execute(
+            text("""insert into ihrms.advance_recovery (advance_id, amount, source)
+                    values (:a, :amt, 'fnf')"""),
+            {"a": adv["id"], "amt": adv["outstanding"]},
+        )
+        await session.execute(
+            text("""update ihrms.advance set outstanding=0, status='closed',
+                    updated_at=now() where id=:id"""),
+            {"id": adv["id"]},
+        )
     await record_audit(
         session, principal, "exit.paid", "employee", str(case.employee_id),
         summary="F&F paid · access revoked · employee deactivated",

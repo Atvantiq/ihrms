@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contexts.advances.service import emi_for_month
 from app.contexts.attendance.repo import month_summary
 from app.contexts.identity.principal import (
     ROLE_HR_ADMIN,
@@ -284,10 +285,44 @@ async def create_run(
         # treated as present (paid) — never withhold pay merely because
         # attendance wasn't recorded. att.lop (which includes unmarked days)
         # is for the attendance view's "needs attention", not for pay.
+        #
+        # Recover this month's EMI on the employee's active advance/loan (the
+        # final instalment clears the remainder). One recovery row per run.
+        adv = (
+            await session.execute(
+                text("""select id::text, emi_amount, outstanding from ihrms.advance
+                        where employee_id = :emp and status = 'active'
+                        order by created_at limit 1"""),
+                {"emp": st["employee_id"]},
+            )
+        ).mappings().first()
+        loan_recovery = D(0)
+        if adv is not None:
+            loan_recovery = emi_for_month(adv["emi_amount"], adv["outstanding"])
+
         slip = compute_payslip(
             s, working_days=payload.working_days,
-            lop_days=D(att.absent), declared_tds=tds, rates=rates,
+            lop_days=D(att.absent), declared_tds=tds, loan_recovery=loan_recovery,
+            rates=rates,
         )
+        if adv is not None and loan_recovery > 0:
+            await session.execute(
+                text("""insert into ihrms.advance_recovery
+                        (advance_id, amount, source, run_id)
+                        values (:a, :amt, 'payroll', cast(:run as uuid))
+                        on conflict (advance_id, run_id)
+                          where run_id is not null do nothing"""),
+                {"a": adv["id"], "amt": loan_recovery, "run": run_id},
+            )
+            new_outstanding = adv["outstanding"] - loan_recovery
+            new_status = "closed" if new_outstanding <= 0 else "active"
+            await session.execute(
+                text("""update ihrms.advance
+                        set outstanding = cast(:rem as numeric), status = :st,
+                            updated_at = now()
+                        where id = :id"""),
+                {"rem": new_outstanding, "st": new_status, "id": adv["id"]},
+            )
         await session.execute(
             text("""insert into ihrms.payslip
                     (run_id, employee_id, lop_days, earnings, deductions,

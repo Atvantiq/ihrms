@@ -4,11 +4,13 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   fetchEmployee,
+  fetchEmployeeAdvances,
   fetchEmployeeAssets,
   fetchEmployeePayslips,
   fetchLeaveBalances,
   fetchMe,
   fetchStructure,
+  type Advance,
   type Asset,
   type EmployeeDetail,
   type LeaveBalance,
@@ -61,6 +63,7 @@ export default function ProfilePage({
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [advances, setAdvances] = useState<Advance[]>([]);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -73,6 +76,7 @@ export default function ProfilePage({
           fetchLeaveBalances(empIdNum).then(setBalances).catch(() => {});
           fetchEmployeePayslips(empIdNum).then(setPayslips).catch(() => {});
           fetchEmployeeAssets(empIdNum).then(setAssets).catch(() => {});
+          fetchEmployeeAdvances(empIdNum).then(setAdvances).catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
@@ -247,6 +251,30 @@ export default function ProfilePage({
                 <span className="text-[11px] capitalize text-mute">{a.category}</span>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {emp.pii_visible && advances.some((a) => a.status === "active") && (
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <h2 className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">
+            Advances &amp; loans
+          </h2>
+          <div className="divide-y divide-line-2">
+            {advances
+              .filter((a) => a.status === "active")
+              .map((a) => (
+                <div key={a.id} className="flex items-center justify-between px-5 py-2.5 text-sm">
+                  <span className="text-ink capitalize">
+                    {a.kind}
+                    {a.reason && <span className="ml-2 text-[11px] text-mute">{a.reason}</span>}
+                  </span>
+                  <span className="text-[11px] text-mute">
+                    EMI {inr(a.emi_amount)} · outstanding{" "}
+                    <span className="font-semibold text-warn">{inr(a.outstanding)}</span>
+                  </span>
+                </div>
+              ))}
           </div>
         </section>
       )}

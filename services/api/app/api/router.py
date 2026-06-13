@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.health import router as health_router
+from app.contexts.advances.api import router as advances_router
 from app.contexts.assets.api import router as assets_router
 from app.contexts.attendance.api import router as attendance_router
 from app.contexts.audit.api import router as audit_router
@@ -27,6 +28,7 @@ api_router.include_router(dashboard_router)
 api_router.include_router(pulse_router)
 api_router.include_router(tasks_router)
 api_router.include_router(assets_router)
+api_router.include_router(advances_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

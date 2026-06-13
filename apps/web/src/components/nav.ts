@@ -58,6 +58,7 @@ export const NAV: NavSection[] = [
     label: "Operations",
     items: [
       { label: "Assets", href: "/assets", icon: "▢", hrOnly: true },
+      { label: "Advances", href: "/advances", icon: "₹", hrOnly: true },
     ],
   },
   {
