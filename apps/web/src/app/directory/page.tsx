@@ -41,6 +41,8 @@ export default function DirectoryPage() {
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
   const [isHr, setIsHr] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 25;
 
   useEffect(() => {
     fetchMe()
@@ -55,17 +57,30 @@ export default function DirectoryPage() {
     return () => clearTimeout(t);
   }, [q]);
 
+  // any filter change resets to the first page
   useEffect(() => {
-    fetchEmployees({ q: debouncedQ, department, status })
+    setPage(0);
+  }, [debouncedQ, department, status]);
+
+  useEffect(() => {
+    fetchEmployees({
+      q: debouncedQ,
+      department,
+      status,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    })
       .then((d) => {
         setData(d);
         setError(null);
       })
       .catch((e: Error) => setError(e.message));
-  }, [debouncedQ, department, status]);
+  }, [debouncedQ, department, status, page]);
 
   const stats = data?.stats;
   const departments = useMemo(() => stats?.departments ?? [], [stats]);
+  const totalMatches = data?.total_matches ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalMatches / PAGE_SIZE));
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 p-6">
@@ -227,6 +242,36 @@ export default function DirectoryPage() {
               )}
             </tbody>
           </table>
+          {totalMatches > 0 && (
+            <div className="flex items-center justify-between border-t border-line px-4 py-2.5 text-xs text-mute">
+              <span>
+                Showing {page * PAGE_SIZE + 1}–
+                {Math.min((page + 1) * PAGE_SIZE, totalMatches)} of{" "}
+                {totalMatches}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px]">
+                  Page {page + 1} of {pageCount}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="rounded-md border border-line px-2 py-1 text-mute hover:text-ink disabled:opacity-40"
+                  aria-label="Previous page"
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                  disabled={page >= pageCount - 1}
+                  className="rounded-md border border-line px-2 py-1 text-mute hover:text-ink disabled:opacity-40"
+                  aria-label="Next page"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </main>

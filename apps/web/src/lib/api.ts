@@ -247,11 +247,15 @@ export function fetchEmployees(params: {
   q?: string;
   department?: string;
   status?: string;
+  limit?: number;
+  offset?: number;
 }): Promise<EmployeeListOut> {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
   if (params.department) qs.set("department", params.department);
   if (params.status) qs.set("status", params.status);
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.offset != null) qs.set("offset", String(params.offset));
   const suffix = qs.size ? `?${qs}` : "";
   return apiGet<EmployeeListOut>(`/employees${suffix}`);
 }
