@@ -517,6 +517,79 @@ export function payFnf(caseId: string): Promise<ExitCase> {
   return apiPost<ExitCase>(`/exit/cases/${caseId}/fnf/pay`, {});
 }
 
+// ---- exit depth: KT checklist, interview, alumni, analytics
+
+export interface KtItem {
+  id: string;
+  task: string;
+  assignee: string | null;
+  status: "pending" | "done";
+  note: string | null;
+}
+export function fetchKt(caseId: string): Promise<KtItem[]> {
+  return apiGet<KtItem[]>(`/exit/cases/${caseId}/kt`);
+}
+export function seedKt(caseId: string): Promise<KtItem[]> {
+  return apiPost<KtItem[]>(`/exit/cases/${caseId}/kt/seed-defaults`, {});
+}
+export function addKt(caseId: string, task: string, assignee?: string): Promise<KtItem[]> {
+  return apiPost<KtItem[]>(`/exit/cases/${caseId}/kt`, { task, assignee: assignee ?? null });
+}
+export function toggleKt(caseId: string, itemId: string): Promise<KtItem[]> {
+  return apiPost<KtItem[]>(`/exit/cases/${caseId}/kt/${itemId}/toggle`, {});
+}
+
+export interface ExitInterview {
+  primary_reason: string | null;
+  would_recommend: boolean | null;
+  rating_management: number | null;
+  rating_role: number | null;
+  rating_culture: number | null;
+  feedback: string | null;
+  conducted_on: string | null;
+}
+export function fetchInterview(caseId: string): Promise<ExitInterview | null> {
+  return apiGet<ExitInterview | null>(`/exit/cases/${caseId}/interview`);
+}
+export function saveInterview(
+  caseId: string,
+  body: Partial<ExitInterview>,
+): Promise<ExitInterview> {
+  return apiPut<ExitInterview>(`/exit/cases/${caseId}/interview`, body);
+}
+
+export interface Alumnus {
+  id: string;
+  employee_id: number;
+  employee_name: string;
+  eligible_for_rehire: boolean;
+  personal_email: string | null;
+  note: string | null;
+  last_working_day: string | null;
+}
+export function fetchAlumni(): Promise<Alumnus[]> {
+  return apiGet<Alumnus[]>("/exit/alumni");
+}
+export function upsertAlumni(body: {
+  employee_id: number;
+  eligible_for_rehire: boolean;
+  personal_email?: string | null;
+  note?: string | null;
+}): Promise<Alumnus> {
+  return apiPost<Alumnus>("/exit/alumni", body);
+}
+
+export interface ExitAnalytics {
+  total_exits: number;
+  by_reason: Record<string, number>;
+  by_month: Record<string, number>;
+  avg_tenure_days: number;
+  attrition_rate_pct: string;
+}
+export function fetchExitAnalytics(): Promise<ExitAnalytics> {
+  return apiGet<ExitAnalytics>("/exit/analytics");
+}
+
 // ----------------------------------------------------------------- performance
 
 export interface ReviewCycle {
