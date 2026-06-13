@@ -284,6 +284,43 @@ export function fetchLetterTypes(): Promise<LetterType[]> {
   return apiGet<LetterType[]>("/letters/types");
 }
 
+export interface Band {
+  id: string;
+  code: string;
+  name: string;
+  level: number;
+  min_ctc: string;
+  max_ctc: string;
+}
+export interface EmployeeBand {
+  employee_id: number;
+  band_id: string | null;
+  band_code: string | null;
+  band_name: string | null;
+  min_ctc: string | null;
+  max_ctc: string | null;
+  current_ctc: string | null;
+  fit: "within" | "below" | "above" | null;
+}
+export function fetchBands(): Promise<Band[]> {
+  return apiGet<Band[]>("/bands");
+}
+export function createBand(body: {
+  code: string;
+  name: string;
+  level: number;
+  min_ctc: string;
+  max_ctc: string;
+}): Promise<Band> {
+  return apiPost<Band>("/bands", body);
+}
+export function assignBand(employeeId: number, bandId: string): Promise<EmployeeBand> {
+  return apiPost<EmployeeBand>("/bands/assign", { employee_id: employeeId, band_id: bandId });
+}
+export function fetchEmployeeBand(employeeId: number): Promise<EmployeeBand> {
+  return apiGet<EmployeeBand>(`/bands/employee/${employeeId}`);
+}
+
 export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }

@@ -8,6 +8,7 @@ import {
   fetchEmployee,
   fetchEmployeeAdvances,
   fetchEmployeeAssets,
+  fetchEmployeeBand,
   fetchEmployeeHistory,
   fetchEmployeePayslips,
   fetchLeaveBalances,
@@ -19,6 +20,7 @@ import {
   type Advance,
   type Asset,
   type ConsentLine,
+  type EmployeeBand,
   type EmployeeDetail,
   type HistoryEntry,
   type LeaveBalance,
@@ -27,6 +29,12 @@ import {
   type StatutoryIds,
   type StructureSaved,
 } from "@/lib/api";
+
+const FIT_STYLE: Record<string, string> = {
+  within: "bg-green-soft text-green-strong",
+  below: "bg-warn-soft text-warn-strong",
+  above: "bg-red-soft text-red-strong",
+};
 
 const HISTORY_DOT: Record<HistoryEntry["category"], string> = {
   job: "bg-indigo",
@@ -95,6 +103,7 @@ export default function ProfilePage({
   const [statutory, setStatutory] = useState<StatutoryIds | null>(null);
   const [statMsg, setStatMsg] = useState<string | null>(null);
   const [letterTypes, setLetterTypes] = useState<LetterType[]>([]);
+  const [band, setBand] = useState<EmployeeBand | null>(null);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -111,6 +120,7 @@ export default function ProfilePage({
           fetchConsent(empIdNum).then(setConsent).catch(() => {});
           fetchEmployeeHistory(empIdNum).then(setHistory).catch(() => {});
           fetchStatutoryIds(empIdNum).then(setStatutory).catch(() => {});
+          fetchEmployeeBand(empIdNum).then(setBand).catch(() => {});
         }
       })
       .catch((e: Error) => setError(e.message));
@@ -219,6 +229,21 @@ export default function ProfilePage({
           <Field label="HRA" value={inr(structure.hra)} />
           <Field label="Special allowance" value={inr(structure.special_allowance)} />
           <Field label="Tax regime" value={`${structure.tax_regime} regime`} />
+          {band?.band_code && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-mute">
+                Band
+              </div>
+              <div className="mt-0.5 flex items-center gap-2 text-sm text-ink">
+                {band.band_code} · {band.band_name}
+                {band.fit && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase ${FIT_STYLE[band.fit]}`}>
+                    {band.fit} band
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </Section>
       )}
 
