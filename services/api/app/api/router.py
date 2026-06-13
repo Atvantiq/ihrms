@@ -17,6 +17,7 @@ from app.contexts.duty.api import router as duty_router
 from app.contexts.employee_records.api import router as employee_records_router
 from app.contexts.exit_fnf.api import router as exit_router
 from app.contexts.feedback.api import router as feedback_router
+from app.contexts.growth.api import router as growth_router
 from app.contexts.helpdesk.api import router as helpdesk_router
 from app.contexts.identity.api import router as me_router
 from app.contexts.identity.dev_login import router as dev_login_router
@@ -52,6 +53,7 @@ api_router.include_router(salary_config_router)
 api_router.include_router(overtime_router)
 api_router.include_router(comp_off_router)
 api_router.include_router(feedback_router)
+api_router.include_router(growth_router)
 api_router.include_router(letters_router)
 api_router.include_router(bands_router)
 api_router.include_router(check_ins_router)

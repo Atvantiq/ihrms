@@ -4,13 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import {
   addGoal,
   approveIncrement,
+  closeMentorship,
   createCycle,
+  createMentorship,
   enrollCycle,
   fetchCalibration,
   fetchCycleReviews,
   fetchCycles,
+  fetchEmployees,
   fetchGoals,
   fetchMe,
+  fetchMentorships,
   fetchMyReviews,
   proposeIncrement,
   publishReview,
@@ -19,10 +23,13 @@ import {
   submitSelfReview,
   updateGoal,
   type Calibration,
+  type EmployeeListItem,
   type Goal,
+  type MentorshipPair,
   type Review,
   type ReviewCycle,
 } from "@/lib/api";
+import { DevelopmentPlans } from "@/components/DevelopmentPlans";
 
 function inr(v: string | number): string {
   return "₹" + Number(v).toLocaleString("en-IN");
@@ -321,6 +328,97 @@ function CalibrationPanel({ cycleId, onError }: { cycleId: string; onError: (m: 
   );
 }
 
+function MentorshipsPanel({ onError }: { onError: (m: string) => void }) {
+  const [pairs, setPairs] = useState<MentorshipPair[]>([]);
+  const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
+  const [adding, setAdding] = useState(false);
+
+  const reload = useCallback(() => {
+    fetchMentorships().then(setPairs).catch((e) => onError(e.message));
+  }, [onError]);
+  useEffect(() => {
+    reload();
+    fetchEmployees({ limit: 500 }).then((r) => setEmployees(r.items)).catch(() => {});
+  }, [reload]);
+
+  async function act(fn: () => Promise<unknown>) {
+    try {
+      await fn();
+      reload();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
+
+  async function create(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    await act(() =>
+      createMentorship({
+        mentor_id: Number(fd.get("mentor_id")),
+        mentee_id: Number(fd.get("mentee_id")),
+        focus: (fd.get("focus") as string) || null,
+      }),
+    );
+    form.reset();
+    setAdding(false);
+  }
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+        <h2 className="text-sm font-semibold text-ink">
+          Mentorships <span className="font-normal text-mute">({pairs.length})</span>
+        </h2>
+        <button onClick={() => setAdding(!adding)} className="text-xs font-medium text-blue-strong hover:underline">
+          {adding ? "Cancel" : "+ Pair"}
+        </button>
+      </div>
+      {adding && (
+        <form onSubmit={create} className="flex flex-wrap items-end gap-2 border-b border-line bg-canvas p-3">
+          <select name="mentor_id" required defaultValue="" className="rounded-lg border border-line px-2 py-1.5 text-sm">
+            <option value="" disabled>Mentor…</option>
+            {employees.map((m) => <option key={m.employee_id} value={m.employee_id}>{m.full_name}</option>)}
+          </select>
+          <select name="mentee_id" required defaultValue="" className="rounded-lg border border-line px-2 py-1.5 text-sm">
+            <option value="" disabled>Mentee…</option>
+            {employees.map((m) => <option key={m.employee_id} value={m.employee_id}>{m.full_name}</option>)}
+          </select>
+          <input name="focus" placeholder="Focus" className="min-w-32 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm" />
+          <button className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface">Pair</button>
+        </form>
+      )}
+      <div className="divide-y divide-line-2">
+        {pairs.map((p) => (
+          <div key={p.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+            <span className="text-ink">
+              {p.mentor_name ?? p.mentor_id} <span className="text-mute">→</span>{" "}
+              {p.mentee_name ?? p.mentee_id}
+              {p.focus && <span className="ml-2 text-[11px] text-mute">{p.focus}</span>}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                p.status === "active" ? "bg-green-soft text-green-strong" : "bg-line-2 text-mute"
+              }`}>
+                {p.status}
+              </span>
+              {p.status === "active" && (
+                <button onClick={() => act(() => closeMentorship(p.id))} className="text-[11px] text-mute hover:text-ink">
+                  Close
+                </button>
+              )}
+            </span>
+          </div>
+        ))}
+        {pairs.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm text-mute">No mentorships yet.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function PerformancePage() {
   const [isHr, setIsHr] = useState(false);
   const [cycles, setCycles] = useState<ReviewCycle[]>([]);
@@ -417,7 +515,11 @@ export default function PerformancePage() {
 
       {isHr && selected && <CycleReviews cycleId={selected} onError={setError} />}
 
+      {isHr && <MentorshipsPanel onError={setError} />}
+
       <MyPanel onError={setError} />
+
+      <DevelopmentPlans title="My development plans" />
     </div>
   );
 }

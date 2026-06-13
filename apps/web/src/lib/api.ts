@@ -664,6 +664,72 @@ export interface Calibration {
 export function fetchCalibration(cycleId: string): Promise<Calibration> {
   return apiGet<Calibration>(`/performance/cycles/${cycleId}/calibration`);
 }
+
+// ---- growth: development plans + mentorship
+
+export interface ActionItem {
+  id: string;
+  action: string;
+  status: "pending" | "done";
+}
+export interface DevelopmentPlan {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  focus_area: string;
+  objective: string;
+  target_date: string | null;
+  status: "active" | "achieved" | "dropped";
+  actions: ActionItem[];
+}
+export function fetchDevelopmentPlans(employeeId?: number): Promise<DevelopmentPlan[]> {
+  const q = employeeId != null ? `?employee_id=${employeeId}` : "";
+  return apiGet<DevelopmentPlan[]>(`/growth/plans${q}`);
+}
+export function createDevelopmentPlan(body: {
+  employee_id?: number;
+  focus_area: string;
+  objective: string;
+  target_date?: string | null;
+}): Promise<DevelopmentPlan> {
+  return apiPost<DevelopmentPlan>("/growth/plans", body);
+}
+export function setPlanStatus(
+  planId: string,
+  status: "active" | "achieved" | "dropped",
+): Promise<DevelopmentPlan> {
+  return apiPatch<DevelopmentPlan>(`/growth/plans/${planId}`, { status });
+}
+export function addPlanAction(planId: string, action: string): Promise<DevelopmentPlan> {
+  return apiPost<DevelopmentPlan>(`/growth/plans/${planId}/actions`, { action });
+}
+export function togglePlanAction(planId: string, actionId: string): Promise<DevelopmentPlan> {
+  return apiPost<DevelopmentPlan>(`/growth/plans/${planId}/actions/${actionId}/toggle`, {});
+}
+
+export interface MentorshipPair {
+  id: string;
+  mentor_id: number;
+  mentor_name: string | null;
+  mentee_id: number;
+  mentee_name: string | null;
+  focus: string | null;
+  status: "active" | "closed";
+  started_on: string;
+}
+export function fetchMentorships(): Promise<MentorshipPair[]> {
+  return apiGet<MentorshipPair[]>("/growth/mentorships");
+}
+export function createMentorship(body: {
+  mentor_id: number;
+  mentee_id: number;
+  focus?: string | null;
+}): Promise<MentorshipPair> {
+  return apiPost<MentorshipPair>("/growth/mentorships", body);
+}
+export function closeMentorship(id: string): Promise<MentorshipPair> {
+  return apiPost<MentorshipPair>(`/growth/mentorships/${id}/close`, {});
+}
 export function fetchMyReviews(): Promise<Review[]> {
   return apiGet<Review[]>("/performance/reviews/mine");
 }

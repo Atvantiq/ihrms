@@ -42,6 +42,7 @@ const CONSENT_STATUS_STYLE: Record<ConsentLine["status"], string> = {
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 import { LeaveStatusBadge } from "@/components/LeaveStatusBadge";
+import { DevelopmentPlans } from "@/components/DevelopmentPlans";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -347,6 +348,8 @@ export default function SelfServicePage() {
           ))}
         </div>
       </section>
+
+      <DevelopmentPlans title="My development plans" />
 
       <section className="rounded-xl border border-line bg-surface shadow-sm">
         <div className="border-b border-line px-4 py-2.5">
