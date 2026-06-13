@@ -1188,6 +1188,68 @@ export function availCompOff(id: string, availDate: string): Promise<CompOff> {
   return apiPost<CompOff>(`/comp-off/${id}/avail`, { avail_date: availDate });
 }
 
+// ------------------------------------------------------------ salary config
+
+export type ComponentType = "earning" | "reimbursement" | "deduction" | "employer";
+export type CalcType = "fixed" | "pct_ctc" | "pct_basic" | "pct_gross" | "balancing";
+
+export interface SalaryComponent {
+  id: string;
+  code: string;
+  name: string;
+  component_type: ComponentType;
+  calc_type: CalcType;
+  value: string;
+  tax_treatment: "taxable" | "partial" | "exempt";
+  pf_wage: boolean;
+  esi_wage: boolean;
+  pt_wage: boolean;
+  on_payslip: boolean;
+}
+export interface SalaryConfigPreviewLine {
+  code: string;
+  name: string;
+  amount: string;
+}
+export interface SalaryConfigPreview {
+  ctc_annual: string;
+  monthly_ctc: string;
+  lines: SalaryConfigPreviewLine[];
+  gross_monthly: string;
+}
+
+export function fetchSalaryComponents(): Promise<SalaryComponent[]> {
+  return apiGet<SalaryComponent[]>("/salary-config/components");
+}
+export function createSalaryComponent(body: {
+  code: string;
+  name: string;
+  component_type: ComponentType;
+  calc_type: CalcType;
+  value: string;
+  tax_treatment?: "taxable" | "partial" | "exempt";
+  pf_wage?: boolean;
+  esi_wage?: boolean;
+  pt_wage?: boolean;
+  sort_order?: number;
+}): Promise<SalaryComponent> {
+  return apiPost<SalaryComponent>("/salary-config/components", body);
+}
+export async function deactivateSalaryComponent(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/salary-config/components/${id}`, {
+    method: "DELETE",
+    headers: { ...(await authHeader()) },
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Delete failed (${res.status})`);
+  }
+}
+export function previewSalaryStructure(ctcAnnual: string): Promise<SalaryConfigPreview> {
+  return apiGet<SalaryConfigPreview>(
+    `/salary-config/preview?ctc_annual=${encodeURIComponent(ctcAnnual)}`,
+  );
+}
+
 // ----------------------------------------------------------------- payroll
 
 export interface StructurePreview {

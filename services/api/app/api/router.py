@@ -31,6 +31,7 @@ from app.contexts.policies.api import router as policies_router
 from app.contexts.pulse.api import router as pulse_router
 from app.contexts.recruitment.api import router as recruitment_router
 from app.contexts.reports.api import router as reports_router
+from app.contexts.salary_config.api import router as salary_config_router
 from app.contexts.shifts.api import router as shifts_router
 from app.contexts.tasks.api import router as tasks_router
 from app.contexts.tax.api import router as tax_router
@@ -46,6 +47,7 @@ api_router.include_router(advances_router)
 api_router.include_router(consent_router)
 api_router.include_router(tax_router)
 api_router.include_router(shifts_router)
+api_router.include_router(salary_config_router)
 api_router.include_router(overtime_router)
 api_router.include_router(comp_off_router)
 api_router.include_router(feedback_router)
