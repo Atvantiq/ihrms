@@ -191,6 +191,28 @@ async def inbox(
             )
         )
 
+    # 2e) Policies I still need to acknowledge (everyone).
+    unacked = await _scalar(
+        session,
+        """select count(*) from ihrms.policy p where p.is_active and not exists (
+             select 1 from ihrms.policy_ack a
+             where a.policy_id = p.id and a.employee_id = :me)""",
+        me=me,
+    )
+    if unacked:
+        decisions.append(
+            Decision(
+                kind="policy_ack",
+                severity="low",
+                icon="▤",
+                title=f"{unacked} policy acknowledgement{'s' if unacked != 1 else ''} pending",
+                detail="Review and acknowledge new policies.",
+                action_label="Review",
+                action_href="/policies",
+                count=unacked,
+            )
+        )
+
     # The remaining signals are HR/platform decisions.
     if is_hr:
         # 3) Increment proposals awaiting approval.

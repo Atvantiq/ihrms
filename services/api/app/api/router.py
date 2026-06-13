@@ -26,6 +26,7 @@ from app.contexts.overtime.api import router as overtime_router
 from app.contexts.payroll.api import router as payroll_router
 from app.contexts.performance.api import router as performance_router
 from app.contexts.pip.api import router as pip_router
+from app.contexts.policies.api import router as policies_router
 from app.contexts.pulse.api import router as pulse_router
 from app.contexts.recruitment.api import router as recruitment_router
 from app.contexts.reports.api import router as reports_router
@@ -53,6 +54,7 @@ api_router.include_router(check_ins_router)
 api_router.include_router(pip_router)
 api_router.include_router(duty_router)
 api_router.include_router(helpdesk_router)
+api_router.include_router(policies_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

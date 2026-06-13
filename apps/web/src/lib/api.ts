@@ -851,6 +851,42 @@ export function fetchWall(): Promise<Feedback[]> {
   return apiGet<Feedback[]>("/feedback/wall");
 }
 
+// ----------------------------------------------------------------- policies
+
+export interface Policy {
+  id: string;
+  title: string;
+  category: string;
+  body: string;
+  version: number;
+  published_at: string;
+  acknowledged: boolean;
+}
+export interface PolicyCompliance {
+  policy_id: string;
+  title: string;
+  acknowledged: number;
+  headcount: number;
+  pending: number;
+}
+export function fetchPolicies(): Promise<Policy[]> {
+  return apiGet<Policy[]>("/policies");
+}
+export function publishPolicy(body: {
+  title: string;
+  category: string;
+  body: string;
+  version: number;
+}): Promise<Policy> {
+  return apiPost<Policy>("/policies", body);
+}
+export function ackPolicy(id: string): Promise<Policy> {
+  return apiPost<Policy>(`/policies/${id}/ack`, {});
+}
+export function fetchPolicyCompliance(id: string): Promise<PolicyCompliance> {
+  return apiGet<PolicyCompliance>(`/policies/${id}/compliance`);
+}
+
 // ----------------------------------------------------------------- helpdesk
 
 export interface Ticket {
