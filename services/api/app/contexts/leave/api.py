@@ -201,8 +201,9 @@ async def apply_leave(
              "reason": payload.reason, "by": principal.employee_id},
         )
     ).scalar_one()
+    result = await _get_request(session, req_id, principal)
     await session.commit()
-    return await _get_request(session, req_id, principal)
+    return result
 
 
 # ---------------------------------------------------------------- list
@@ -349,8 +350,9 @@ async def approve(
         session, principal, "leave.approve", "leave_request", req_id,
         summary=f"Approved {req['days']} day(s)",
     )
+    result = await _get_request(session, req_id, principal)
     await session.commit()
-    return await _get_request(session, req_id, principal)
+    return result
 
 
 @router.post("/requests/{req_id}/reject", response_model=LeaveRequestOut)
@@ -388,8 +390,9 @@ async def reject(
         session, principal, "leave.reject", "leave_request", req_id,
         summary="Rejected leave request",
     )
+    result = await _get_request(session, req_id, principal)
     await session.commit()
-    return await _get_request(session, req_id, principal)
+    return result
 
 
 @router.post("/requests/{req_id}/cancel", response_model=LeaveRequestOut)
@@ -425,5 +428,6 @@ async def cancel(
         session, principal, "leave.cancel", "leave_request", req_id,
         summary="Cancelled leave request",
     )
+    result = await _get_request(session, req_id, principal)
     await session.commit()
-    return await _get_request(session, req_id, principal)
+    return result

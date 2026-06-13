@@ -104,8 +104,9 @@ async def create_master(
         session, principal, "org_master.create", "org_master", row["id"],
         summary=f"Created {payload.kind} '{payload.name.strip()}'",
     )
+    out = MasterOut(**dict(row), raw_values=[], employee_count=0)
     await session.commit()
-    return MasterOut(**dict(row), raw_values=[], employee_count=0)
+    return out
 
 
 @router.patch("/masters/{master_id}", response_model=MasterOut)
@@ -128,9 +129,10 @@ async def rename_master(
         session, principal, "org_master.rename", "org_master", master_id,
         summary=f"Renamed to '{payload.name.strip()}'",
     )
-    await session.commit()
     masters = await list_masters(session, principal, kind=row["kind"])
-    return next(m for m in masters if m.id == master_id)
+    result = next(m for m in masters if m.id == master_id)
+    await session.commit()
+    return result
 
 
 @router.post("/masters/{master_id}/merge", response_model=MasterOut)
@@ -172,6 +174,7 @@ async def merge_master(
         summary=f"Merged into {payload.into_master_id}",
         changes={"into_master_id": payload.into_master_id},
     )
-    await session.commit()
     masters = await list_masters(session, principal, kind=pair["dst_kind"])
-    return next(m for m in masters if m.id == payload.into_master_id)
+    result = next(m for m in masters if m.id == payload.into_master_id)
+    await session.commit()
+    return result

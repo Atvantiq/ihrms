@@ -151,5 +151,4 @@ async def create_employee(session: AsyncSession, payload: EmployeeCreate) -> int
             "date_of_joining": payload.date_of_joining,
         },
     )
-    await session.commit()
     return employee_id

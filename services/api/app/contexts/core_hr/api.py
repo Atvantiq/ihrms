@@ -114,8 +114,9 @@ async def add_employee(
         + f" ({payload.employee_code})",
         changes={"employee_code": payload.employee_code, "designation": payload.designation},
     )
+    result = await get_employee(employee_id, session, principal)
     await session.commit()
-    return await get_employee(employee_id, session, principal)
+    return result
 
 
 @router.patch("/{employee_id}", response_model=EmployeeDetail)
@@ -138,8 +139,9 @@ async def edit_employee(
         summary=f"Updated {len(changed)} field(s)",
         changes={"fields": changed},
     )
+    result = await get_employee(employee_id, session, principal)
     await session.commit()
-    return await get_employee(employee_id, session, principal)
+    return result
 
 
 @router.get("/{employee_id}", response_model=EmployeeDetail)

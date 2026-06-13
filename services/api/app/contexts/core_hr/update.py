@@ -131,4 +131,3 @@ async def update_employee(
                 {**detail_params, "employee_id": employee_id},
             )
 
-    await session.commit()
