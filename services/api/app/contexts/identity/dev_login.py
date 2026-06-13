@@ -36,13 +36,15 @@ async def dev_login(
     if not (settings.environment == "dev" and settings.dev_login_enabled):
         raise HTTPException(404, "Not found")
 
+    # Resolve the HR admin via ihrms + public.employees only — the app role
+    # deliberately has no access to the Supabase-owned `auth` schema.
     row = (
         await session.execute(
-            text("""select u.id::text as uid, u.email
+            text("""select ua.auth_user_id::text as uid, e.email
                     from ihrms.user_account ua
-                    join auth.users u on u.id = ua.auth_user_id
+                    join public.employees e on e.employee_id = ua.employee_id
                     where 'hr_admin' = any(ua.roles) and ua.is_active
-                    order by u.email limit 1""")
+                    order by e.email limit 1""")
         )
     ).mappings().first()
     if row is None:

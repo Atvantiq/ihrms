@@ -357,3 +357,34 @@ export function decideLeave(
     action === "cancel" ? undefined : { note: note ?? null },
   );
 }
+
+// ----------------------------------------------------------------- holidays
+
+export interface Holiday {
+  id: string;
+  name: string;
+  holiday_date: string;
+  type: "public" | "optional" | "restricted";
+}
+
+export function fetchHolidays(year?: number): Promise<Holiday[]> {
+  return apiGet<Holiday[]>(`/holidays${year ? `?year=${year}` : ""}`);
+}
+
+export function addHoliday(
+  name: string,
+  holiday_date: string,
+  type: Holiday["type"] = "public",
+): Promise<Holiday> {
+  return apiPost<Holiday>("/holidays", { name, holiday_date, type });
+}
+
+export async function deleteHoliday(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/holidays/${id}`, {
+    method: "DELETE",
+    headers: { ...(await authHeader()) },
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Delete failed (${res.status})`);
+  }
+}

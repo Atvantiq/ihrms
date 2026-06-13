@@ -54,6 +54,27 @@ class TestWorkingDays:
         assert working_days(date(2026, 6, 20), date(2026, 6, 21), False) == Decimal(0)
 
 
+class TestWorkingDaysWithHolidays:
+    def test_holiday_excluded(self) -> None:
+        # Mon–Fri week with Wed a holiday = 4 working days
+        hol = frozenset({date(2026, 6, 24)})
+        assert working_days(date(2026, 6, 22), date(2026, 6, 26), False, hol) == Decimal("4")
+
+    def test_holiday_on_weekend_no_double_subtract(self) -> None:
+        # holiday falling on Saturday doesn't reduce the count further
+        hol = frozenset({date(2026, 6, 20)})
+        assert working_days(date(2026, 6, 22), date(2026, 6, 26), False, hol) == Decimal("5")
+
+    def test_half_day_on_holiday_raises(self) -> None:
+        hol = frozenset({date(2026, 6, 22)})
+        with pytest.raises(ValueError, match="holiday"):
+            working_days(date(2026, 6, 22), date(2026, 6, 22), True, hol)
+
+    def test_full_range_all_holidays_is_zero(self) -> None:
+        hol = frozenset({date(2026, 6, 22), date(2026, 6, 23)})
+        assert working_days(date(2026, 6, 22), date(2026, 6, 23), False, hol) == Decimal(0)
+
+
 class TestAccrual:
     def test_annual_upfront_gives_full_entitlement(self) -> None:
         got = accrued_to_date("annual_upfront", Decimal("7"), Decimal("0"), date(2026, 1, 5))

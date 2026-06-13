@@ -51,9 +51,10 @@ ONAQT database, so it is documented here rather than auto-applied.
    grant select                 on public.addresses        to ihrms_app;
    grant select, insert         on public.global_ids       to ihrms_app;
 
-   -- auth linking + dev login read auth.users
-   grant select on auth.users to ihrms_app;
    ```
+
+   The app deliberately does **not** access the Supabase-owned `auth` schema
+   (it resolves emails via `public.employees`), so no grant there is needed.
 
 3. **Make `ihrms.v_employee` honour RLS** (Postgres 15+): so the view's
    joins to `ihrms.user_account` are tenant-scoped for the caller, recreate it

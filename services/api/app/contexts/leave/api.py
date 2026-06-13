@@ -25,6 +25,7 @@ from app.contexts.leave.schemas import (
 from app.contexts.leave.service import (
     available,
     ensure_balance,
+    holidays_in_range,
     working_days,
 )
 from app.core.audit import record_audit
@@ -137,8 +138,11 @@ async def apply_leave(
     if lt is None:
         raise HTTPException(404, "Leave type not found")
 
+    holidays = await holidays_in_range(session, payload.start_date, payload.end_date)
     try:
-        days = working_days(payload.start_date, payload.end_date, payload.half_day)
+        days = working_days(
+            payload.start_date, payload.end_date, payload.half_day, holidays
+        )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
 

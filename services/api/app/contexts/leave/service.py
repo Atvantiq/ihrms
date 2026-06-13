@@ -15,8 +15,11 @@ HALF = Decimal("0.5")
 ONE = Decimal("1")
 
 
-def working_days(start: date, end: date, half_day: bool) -> Decimal:
-    """Count Mon–Fri days inclusive. Half-day only valid for a single day."""
+def working_days(
+    start: date, end: date, half_day: bool, holidays: frozenset[date] = frozenset()
+) -> Decimal:
+    """Count working days inclusive, excluding weekends and `holidays`.
+    Half-day only valid for a single working day."""
     if end < start:
         raise ValueError("End date is before start date")
     if half_day and start != end:
@@ -24,14 +27,28 @@ def working_days(start: date, end: date, half_day: bool) -> Decimal:
     days = Decimal(0)
     cur = start
     while cur <= end:
-        if cur.weekday() < 5:  # 0=Mon … 4=Fri
+        if cur.weekday() < 5 and cur not in holidays:  # 0=Mon … 4=Fri
             days += ONE
         cur += timedelta(days=1)
     if half_day:
         if days == 0:
-            raise ValueError("Selected day is a weekend")
+            raise ValueError("Selected day is a weekend or holiday")
         return HALF
     return days
+
+
+async def holidays_in_range(
+    session: "AsyncSession", start: date, end: date
+) -> frozenset[date]:
+    """Active holidays for the tenant within [start, end]."""
+    rows = (
+        await session.execute(
+            text("""select holiday_date from ihrms.holiday
+                    where is_active and holiday_date between :s and :e"""),
+            {"s": start, "e": end},
+        )
+    ).scalars().all()
+    return frozenset(rows)
 
 
 def accrued_to_date(

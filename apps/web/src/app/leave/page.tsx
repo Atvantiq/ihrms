@@ -321,14 +321,22 @@ export default function LeavePage() {
             Your balances and requests · approvals for your team
           </p>
         </div>
-        {!showApply && (
-          <button
-            onClick={() => setShowApply(true)}
-            className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/settings/holidays"
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
           >
-            + Apply for leave
-          </button>
-        )}
+            Holidays
+          </Link>
+          {!showApply && (
+            <button
+              onClick={() => setShowApply(true)}
+              className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface hover:bg-ink-2"
+            >
+              + Apply for leave
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
