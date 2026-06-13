@@ -24,6 +24,7 @@ export const NAV: NavSection[] = [
     label: "People",
     items: [
       { label: "Directory", href: "/directory", icon: "⛁" },
+      { label: "Recruitment", href: "/recruitment", icon: "◎", hrOnly: true },
       { label: "Org masters", href: "/settings/org", icon: "◈", hrOnly: true },
     ],
   },

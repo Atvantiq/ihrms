@@ -264,6 +264,85 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- recruitment
+
+export interface Requisition {
+  id: string;
+  code: string;
+  title: string;
+  department: string | null;
+  location: string | null;
+  openings: number;
+  status: string;
+  candidate_count: number;
+}
+
+export interface Candidate {
+  id: string;
+  requisition_id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  source: string;
+  stage: string;
+  rating: number | null;
+  bgv_status: string;
+  note: string | null;
+  onboarded_employee_id: number | null;
+}
+
+export interface Offer {
+  id: string;
+  candidate_id: string;
+  designation: string;
+  department: string;
+  ctc_annual: string;
+  joining_date: string;
+  status: string;
+}
+
+export function fetchRequisitions(): Promise<Requisition[]> {
+  return apiGet<Requisition[]>("/recruitment/requisitions");
+}
+export function createRequisition(body: {
+  code: string;
+  title: string;
+  department?: string;
+  location?: string;
+  openings: number;
+}): Promise<Requisition> {
+  return apiPost<Requisition>("/recruitment/requisitions", body);
+}
+export function fetchCandidates(requisitionId: string): Promise<Candidate[]> {
+  return apiGet<Candidate[]>(`/recruitment/candidates?requisition_id=${requisitionId}`);
+}
+export function addCandidate(body: {
+  requisition_id: string;
+  name: string;
+  email: string;
+  phone?: string;
+}): Promise<Candidate> {
+  return apiPost<Candidate>("/recruitment/candidates", body);
+}
+export function moveStage(cid: string, stage: string): Promise<Candidate> {
+  return apiPost<Candidate>(`/recruitment/candidates/${cid}/stage`, { stage });
+}
+export function makeOffer(
+  cid: string,
+  body: { designation: string; department: string; ctc_annual: number; joining_date: string },
+): Promise<Offer> {
+  return apiPost<Offer>(`/recruitment/candidates/${cid}/offer`, body);
+}
+export function acceptOffer(cid: string): Promise<Offer> {
+  return apiPost<Offer>(`/recruitment/candidates/${cid}/offer/accept`, {});
+}
+export function onboardCandidate(
+  cid: string,
+  body: { employee_code: string; division: string; branch: string; circle_id: number },
+): Promise<{ candidate_id: string; employee_id: number; employee_code: string }> {
+  return apiPost(`/recruitment/candidates/${cid}/onboard`, body);
+}
+
 // ----------------------------------------------------------------- timesheet
 
 export interface Project {
