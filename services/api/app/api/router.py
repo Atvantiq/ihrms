@@ -20,6 +20,7 @@ from app.contexts.performance.api import router as performance_router
 from app.contexts.pulse.api import router as pulse_router
 from app.contexts.recruitment.api import router as recruitment_router
 from app.contexts.reports.api import router as reports_router
+from app.contexts.shifts.api import router as shifts_router
 from app.contexts.tasks.api import router as tasks_router
 from app.contexts.tax.api import router as tax_router
 from app.contexts.timesheet.api import router as timesheet_router
@@ -33,6 +34,7 @@ api_router.include_router(assets_router)
 api_router.include_router(advances_router)
 api_router.include_router(consent_router)
 api_router.include_router(tax_router)
+api_router.include_router(shifts_router)
 api_router.include_router(employees_router)
 api_router.include_router(me_router)
 api_router.include_router(org_router)

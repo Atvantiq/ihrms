@@ -768,6 +768,55 @@ export function markAttendance(
   });
 }
 
+// ----------------------------------------------------------------- shifts
+
+export interface Shift {
+  id: string;
+  code: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  is_night: boolean;
+  hours: string;
+}
+export interface RosterRow {
+  employee_id: number;
+  employee_name: string;
+  shift_code: string | null;
+  shift_name: string | null;
+}
+
+export function fetchShifts(): Promise<Shift[]> {
+  return apiGet<Shift[]>("/shifts");
+}
+export function createShift(body: {
+  code: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+}): Promise<Shift> {
+  return apiPost<Shift>("/shifts", body);
+}
+export function fetchRoster(on?: string): Promise<RosterRow[]> {
+  return apiGet<RosterRow[]>(`/shifts/roster${on ? `?on=${on}` : ""}`);
+}
+export function assignShift(
+  employeeId: number,
+  shiftId: string,
+  effectiveFrom?: string,
+): Promise<{ status: string }> {
+  return apiPost(`/shifts/assign`, {
+    employee_id: employeeId,
+    shift_id: shiftId,
+    effective_from: effectiveFrom ?? null,
+  });
+}
+export function fetchMyShift(): Promise<RosterRow | null> {
+  return apiGet<RosterRow | null>("/shifts/my");
+}
+
 export interface Regularization {
   id: string;
   employee_id: number;
