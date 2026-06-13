@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,8 @@ from app.contexts.identity.principal import (
     get_current_principal,
     require_roles,
 )
+from app.contexts.payroll.outputs import gl_journal, statutory_totals
+from app.contexts.payroll.pdf import payslip_pdf
 from app.contexts.payroll.salary import SalaryStructure, compute_payslip, derive_structure
 from app.contexts.payroll.tds import monthly_tds
 from app.core.audit import record_audit
@@ -382,3 +384,206 @@ async def _payslips(
         )
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------- outputs (M3)
+
+async def _raw_payslips(session: AsyncSession, run_id: str) -> list[dict[str, Any]]:
+    rows = (
+        await session.execute(
+            text("""select employee_id, lop_days, earnings, deductions,
+                       employer_contributions, gross, total_deductions, net_pay
+                    from ihrms.payslip where run_id = :run"""),
+            {"run": run_id},
+        )
+    ).mappings().all()
+
+    def dec(m: dict[str, Any]) -> dict[str, Decimal]:
+        return {k: Decimal(str(v)) for k, v in m.items()}
+
+    return [
+        {**dict(r), "earnings": dec(r["earnings"]), "deductions": dec(r["deductions"]),
+         "employer_contributions": dec(r["employer_contributions"])}
+        for r in rows
+    ]
+
+
+class StatutoryOut(BaseModel):
+    pf_employee: Decimal
+    pf_employer: Decimal
+    esi_employee: Decimal
+    esi_employer: Decimal
+    pt: Decimal
+    tds: Decimal
+
+
+@router.get("/runs/{run_id}/statutory", response_model=StatutoryOut)
+async def run_statutory(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> StatutoryOut:
+    s = statutory_totals(await _raw_payslips(session, run_id))
+    return StatutoryOut(
+        pf_employee=s.pf_employee, pf_employer=s.pf_employer,
+        esi_employee=s.esi_employee, esi_employer=s.esi_employer, pt=s.pt, tds=s.tds,
+    )
+
+
+class JournalLineOut(BaseModel):
+    account: str
+    debit: Decimal
+    credit: Decimal
+
+
+class GLOut(BaseModel):
+    lines: list[JournalLineOut]
+    total_debit: Decimal
+    total_credit: Decimal
+    balanced: bool
+
+
+@router.get("/runs/{run_id}/gl", response_model=GLOut)
+async def run_gl(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> GLOut:
+    j = gl_journal(await _raw_payslips(session, run_id))
+    return GLOut(
+        lines=[JournalLineOut(account=ln.account, debit=ln.debit, credit=ln.credit)
+               for ln in j.lines],
+        total_debit=j.total_debit, total_credit=j.total_credit, balanced=j.balanced,
+    )
+
+
+@router.get("/runs/{run_id}/bankfile")
+async def run_bankfile(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> Response:
+    rows = (
+        await session.execute(
+            text("""select e.employee_code,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm,
+                       b.account_number, b.ifsc, b.bank_name, p.net_pay
+                    from ihrms.payslip p
+                    left join public.employees e on e.employee_id = p.employee_id
+                    left join ihrms.employee_bank b
+                           on b.employee_id = p.employee_id and b.is_active
+                    where p.run_id = :run order by nm"""),
+            {"run": run_id},
+        )
+    ).mappings().all()
+    out = ["EmployeeCode,Name,AccountNumber,IFSC,Bank,Amount,Mode"]
+    for r in rows:
+        out.append(
+            f"{r['employee_code']},{r['nm']},{r['account_number'] or 'NOT_SET'},"
+            f"{r['ifsc'] or 'NOT_SET'},{r['bank_name'] or ''},{r['net_pay']},NEFT"
+        )
+    return Response(
+        content="\n".join(out) + "\n", media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="bankfile_{run_id[:8]}.csv"'},
+    )
+
+
+@router.post("/runs/{run_id}/mark-paid", response_model=RunOut)
+async def mark_paid(
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> RunOut:
+    row = (
+        await session.execute(
+            text("""update ihrms.payroll_run set status = 'paid', paid_at = now()
+                    where id = :id and status = 'finalized'
+                    returning id::text, period_year, period_month, working_days, status,
+                              employee_count, total_gross, total_net"""),
+            {"id": run_id},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(409, "Run must be finalized before marking paid")
+    await record_audit(
+        session, principal, "payroll.paid", "payroll_run", run_id,
+        summary="Marked payroll run as paid",
+    )
+    out = RunOut(**dict(row))
+    await session.commit()
+    return out
+
+
+class PayslipPdfMeta(BaseModel):
+    employee_id: int
+
+
+@router.get("/payslips/{employee_id}/pdf/{run_id}")
+async def payslip_pdf_download(
+    employee_id: int,
+    run_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> Response:
+    if employee_id != principal.employee_id and not principal.is_hr:
+        raise HTTPException(403, "You can only download your own payslip")
+    row = (
+        await session.execute(
+            text("""select r.period_year, r.period_month, p.lop_days, p.earnings,
+                       p.deductions, p.gross, p.total_deductions, p.net_pay,
+                       e.employee_code,
+                       trim(concat(e.first_name,' ',coalesce(e.last_name,''))) as nm
+                    from ihrms.payslip p
+                    join ihrms.payroll_run r on r.id = p.run_id
+                    left join public.employees e on e.employee_id = p.employee_id
+                    where p.run_id = :run and p.employee_id = :emp"""),
+            {"run": run_id, "emp": employee_id},
+        )
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(404, "Payslip not found")
+    pdf = payslip_pdf(
+        employee_name=row["nm"] or str(employee_id),
+        employee_code=row["employee_code"] or "",
+        payslip={
+            "lop_days": row["lop_days"], "earnings": dict(row["earnings"]),
+            "deductions": dict(row["deductions"]), "gross": row["gross"],
+            "total_deductions": row["total_deductions"], "net_pay": row["net_pay"],
+        },
+        year=row["period_year"], month=row["period_month"],
+    )
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="payslip_{run_id[:8]}.pdf"'},
+    )
+
+
+class BankIn(BaseModel):
+    account_number: str = Field(min_length=4, max_length=30)
+    ifsc: str = Field(min_length=4, max_length=15)
+    bank_name: str | None = None
+
+
+@router.put("/bank/{employee_id}", status_code=204)
+async def set_bank(
+    employee_id: int,
+    payload: BankIn,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, require_roles(ROLE_HR_ADMIN)],
+) -> None:
+    await session.execute(
+        text("""update ihrms.employee_bank set is_active = false
+                where employee_id = :emp and is_active"""),
+        {"emp": employee_id},
+    )
+    await session.execute(
+        text("""insert into ihrms.employee_bank (employee_id, account_number, ifsc, bank_name)
+                values (:emp, :acc, :ifsc, :bank)"""),
+        {"emp": employee_id, "acc": payload.account_number, "ifsc": payload.ifsc,
+         "bank": payload.bank_name},
+    )
+    await record_audit(
+        session, principal, "bank.set", "employee", str(employee_id),
+        summary="Updated bank details",
+    )
+    await session.commit()

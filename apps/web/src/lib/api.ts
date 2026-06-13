@@ -446,6 +446,38 @@ export function finalizeRun(id: string): Promise<PayrollRun> {
   return apiPost<PayrollRun>(`/payroll/runs/${id}/finalize`, {});
 }
 
+export function markRunPaid(id: string): Promise<PayrollRun> {
+  return apiPost<PayrollRun>(`/payroll/runs/${id}/mark-paid`, {});
+}
+
+export interface StatutoryTotals {
+  pf_employee: string;
+  pf_employer: string;
+  esi_employee: string;
+  esi_employer: string;
+  pt: string;
+  tds: string;
+}
+
+export function fetchStatutory(runId: string): Promise<StatutoryTotals> {
+  return apiGet<StatutoryTotals>(`/payroll/runs/${runId}/statutory`);
+}
+
+/** Fetch a file endpoint with auth and trigger a browser download. */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { ...(await authHeader()) },
+  });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function fetchRegister(runId: string): Promise<Payslip[]> {
   return apiGet<Payslip[]>(`/payroll/runs/${runId}/register`);
 }

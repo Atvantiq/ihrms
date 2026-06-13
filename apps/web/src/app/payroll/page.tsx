@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   createRun,
+  downloadFile,
   fetchEmployees,
   fetchRegister,
   fetchRuns,
   finalizeRun,
+  markRunPaid,
   previewStructure,
   setStructure,
   type EmployeeListItem,
@@ -148,6 +150,7 @@ function Register({ runId }: { runId: string }) {
             <th className="px-3 py-2 font-semibold">PT</th>
             <th className="px-3 py-2 font-semibold">TDS</th>
             <th className="px-3 py-2 font-semibold">Net pay</th>
+            <th className="px-3 py-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -162,11 +165,24 @@ function Register({ runId }: { runId: string }) {
               <td className="px-3 py-2 text-red-strong">{inr(p.deductions.pt ?? 0)}</td>
               <td className="px-3 py-2 text-red-strong">{inr(p.deductions.tds ?? 0)}</td>
               <td className="px-3 py-2 font-semibold text-ink">{inr(p.net_pay)}</td>
+              <td className="px-3 py-2 text-right">
+                <button
+                  onClick={() =>
+                    downloadFile(
+                      `/payroll/payslips/${p.employee_id}/pdf/${runId}`,
+                      `payslip_${p.employee_id}.pdf`,
+                    )
+                  }
+                  className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink"
+                >
+                  PDF
+                </button>
+              </td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={9} className="px-4 py-6 text-center text-mute">
+              <td colSpan={10} className="px-4 py-6 text-center text-mute">
                 No payslips — set salary structures, then run payroll.
               </td>
             </tr>
@@ -208,6 +224,15 @@ export default function PayrollPage() {
   async function finalize(id: string) {
     try {
       await finalizeRun(id);
+      reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function markPaid(id: string) {
+    try {
+      await markRunPaid(id);
       reload();
     } catch (e) {
       setError((e as Error).message);
@@ -305,12 +330,31 @@ export default function PayrollPage() {
                       >
                         {openRun === r.id ? "Hide" : "Register"}
                       </button>
+                      <button
+                        onClick={() =>
+                          downloadFile(
+                            `/payroll/runs/${r.id}/bankfile`,
+                            `bankfile_${MONTHS[r.period_month - 1]}${r.period_year}.csv`,
+                          )
+                        }
+                        className="rounded-md border border-line px-2 py-1 text-[11px] text-mute hover:text-ink"
+                      >
+                        Bank file
+                      </button>
                       {r.status === "draft" && (
                         <button
                           onClick={() => finalize(r.id)}
                           className="rounded-md bg-green-soft px-2 py-1 text-[11px] font-medium text-green-strong hover:opacity-80"
                         >
                           Finalize
+                        </button>
+                      )}
+                      {r.status === "finalized" && (
+                        <button
+                          onClick={() => markPaid(r.id)}
+                          className="rounded-md bg-ink px-2 py-1 text-[11px] font-medium text-surface hover:bg-ink-2"
+                        >
+                          Mark paid
                         </button>
                       )}
                     </div>
