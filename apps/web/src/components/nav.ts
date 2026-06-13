@@ -55,6 +55,12 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    label: "Operations",
+    items: [
+      { label: "Assets", href: "/assets", icon: "▢", hrOnly: true },
+    ],
+  },
+  {
     label: "Admin",
     items: [
       { label: "Audit log", href: "/settings/audit", icon: "❒", hrOnly: true },

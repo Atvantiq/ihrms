@@ -948,6 +948,61 @@ export function fetchTasks(): Promise<Task[]> {
   return apiGet<Task[]>("/tasks");
 }
 
+// ----------------------------------------------------------------- assets
+
+export interface Asset {
+  id: string;
+  asset_tag: string;
+  category: string;
+  name: string;
+  serial_no: string | null;
+  purchase_date: string | null;
+  purchase_cost: string | null;
+  status: "in_stock" | "assigned" | "retired" | "lost";
+  condition: string;
+  holder_id: number | null;
+  holder_name: string | null;
+  book_value: string | null;
+}
+
+export function fetchAssets(): Promise<Asset[]> {
+  return apiGet<Asset[]>("/assets");
+}
+export function fetchEmployeeAssets(employeeId: number): Promise<Asset[]> {
+  return apiGet<Asset[]>(`/assets/employee/${employeeId}`);
+}
+export function createAsset(body: {
+  asset_tag: string;
+  category: string;
+  name: string;
+  serial_no?: string | null;
+  purchase_date?: string | null;
+  purchase_cost?: string | null;
+  condition?: string;
+}): Promise<Asset> {
+  return apiPost<Asset>("/assets", body);
+}
+export function assignAsset(
+  assetId: string,
+  employeeId: number,
+  note?: string,
+): Promise<Asset> {
+  return apiPost<Asset>(`/assets/${assetId}/assign`, {
+    employee_id: employeeId,
+    note: note ?? null,
+  });
+}
+export function returnAsset(
+  assetId: string,
+  condition?: string,
+  note?: string,
+): Promise<Asset> {
+  return apiPost<Asset>(`/assets/${assetId}/return`, {
+    condition: condition ?? null,
+    note: note ?? null,
+  });
+}
+
 // ----------------------------------------------------------------- leave
 
 export interface LeaveType {
