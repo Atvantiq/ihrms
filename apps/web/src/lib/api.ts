@@ -264,6 +264,48 @@ export function fetchEmployee(employeeId: string): Promise<EmployeeDetail> {
   return apiGet<EmployeeDetail>(`/employees/${employeeId}`);
 }
 
+// ----------------------------------------------------------------- attendance
+
+export interface AttendanceSummary {
+  employee_id: number;
+  year: number;
+  month: number;
+  days: { day: string; status: string }[];
+  present: number;
+  wfh: number;
+  leave: number;
+  holiday: number;
+  weekend: number;
+  absent: number;
+  not_marked: number;
+  upcoming: number;
+  lop: number;
+  payable: number;
+}
+
+export function fetchAttendance(
+  year: number,
+  month: number,
+  employeeId?: number,
+): Promise<AttendanceSummary> {
+  const e = employeeId ? `&employee_id=${employeeId}` : "";
+  return apiGet<AttendanceSummary>(
+    `/attendance/summary?year=${year}&month=${month}${e}`,
+  );
+}
+
+export function markAttendance(
+  employeeId: number,
+  workDate: string,
+  status: "present" | "absent" | "wfh",
+): Promise<AttendanceSummary> {
+  return apiPost<AttendanceSummary>("/attendance", {
+    employee_id: employeeId,
+    work_date: workDate,
+    status,
+  });
+}
+
 // ----------------------------------------------------------------- payroll
 
 export interface StructurePreview {

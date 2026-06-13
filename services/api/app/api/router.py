@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.health import router as health_router
+from app.contexts.attendance.api import router as attendance_router
 from app.contexts.audit.api import router as audit_router
 from app.contexts.core_hr.api import router as employees_router
 from app.contexts.dashboard.api import router as dashboard_router
@@ -20,5 +21,6 @@ api_router.include_router(org_router)
 api_router.include_router(leave_router)
 api_router.include_router(holidays_router)
 api_router.include_router(payroll_router)
+api_router.include_router(attendance_router)
 api_router.include_router(audit_router)
 api_router.include_router(dev_login_router)
