@@ -851,6 +851,51 @@ export function fetchWall(): Promise<Feedback[]> {
   return apiGet<Feedback[]>("/feedback/wall");
 }
 
+// ----------------------------------------------------------------- pip
+
+export interface PipCheckpoint {
+  id: string;
+  checkpoint_date: string;
+  rating: "on_track" | "at_risk" | "off_track";
+  note: string | null;
+  created_at: string;
+}
+export interface Pip {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  manager_id: number | null;
+  reason: string;
+  objectives: string;
+  start_date: string;
+  end_date: string;
+  status: "active" | "improved" | "extended" | "terminated" | "closed";
+  suggested_checkpoints: string[];
+  checkpoints: PipCheckpoint[];
+}
+export function fetchPips(scope: "managed" | "mine" = "managed"): Promise<Pip[]> {
+  return apiGet<Pip[]>(`/pip?scope=${scope}`);
+}
+export function openPip(body: {
+  employee_id: number;
+  reason: string;
+  objectives: string;
+  start_date: string;
+  end_date: string;
+}): Promise<Pip> {
+  return apiPost<Pip>("/pip", body);
+}
+export function addPipCheckpoint(
+  id: string,
+  rating: string,
+  note?: string,
+): Promise<Pip> {
+  return apiPost<Pip>(`/pip/${id}/checkpoint`, { rating, note: note ?? null });
+}
+export function closePip(id: string, outcome: string): Promise<Pip> {
+  return apiPost<Pip>(`/pip/${id}/close`, { outcome });
+}
+
 // ----------------------------------------------------------------- check-ins
 
 export interface CheckIn {
