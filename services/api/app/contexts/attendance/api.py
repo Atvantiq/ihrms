@@ -1,6 +1,5 @@
 """Attendance API — monthly summary (derived) + day marking."""
 
-import calendar
 from datetime import date
 from typing import Annotated, Literal
 
@@ -9,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.contexts.attendance.service import derive_month
+from app.contexts.attendance.repo import month_summary
 from app.contexts.identity.principal import Principal, get_current_principal
 from app.core.audit import record_audit
 from app.core.db import get_session
@@ -62,47 +61,7 @@ async def summary(
     if not (1 <= month <= 12):
         raise HTTPException(422, "Invalid month")
 
-    start = date(year, month, 1)
-    end = date(year, month, calendar.monthrange(year, month)[1])
-
-    marks = {
-        r["work_date"]: r["status"]
-        for r in (
-            await session.execute(
-                text("""select work_date, status from ihrms.attendance_record
-                        where employee_id = :emp and work_date between :s and :e"""),
-                {"emp": target, "s": start, "e": end},
-            )
-        ).mappings().all()
-    }
-
-    # approved leave dates expanded across each request's range
-    leave_dates: set[date] = set()
-    for r in (
-        await session.execute(
-            text("""select start_date, end_date from ihrms.leave_request
-                    where employee_id = :emp and status = 'approved'
-                      and start_date <= :e and end_date >= :s"""),
-            {"emp": target, "s": start, "e": end},
-        )
-    ).mappings().all():
-        d = max(r["start_date"], start)
-        while d <= min(r["end_date"], end):
-            leave_dates.add(d)
-            d = date.fromordinal(d.toordinal() + 1)
-
-    holiday_dates = {
-        r["holiday_date"]
-        for r in (
-            await session.execute(
-                text("""select holiday_date from ihrms.holiday
-                        where is_active and holiday_date between :s and :e"""),
-                {"s": start, "e": end},
-            )
-        ).mappings().all()
-    }
-
-    m = derive_month(year, month, date.today(), marks, leave_dates, holiday_dates)
+    m = await month_summary(session, target, year, month, date.today())
     return SummaryOut(
         employee_id=target, year=year, month=month,
         days=[DayOut(day=d.day, status=d.status) for d in m.days],

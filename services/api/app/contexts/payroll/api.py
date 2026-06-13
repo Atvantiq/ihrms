@@ -1,5 +1,6 @@
 """Payroll API — salary structures + monthly runs (HR), payslips (self/HR)."""
 
+import calendar
 import json
 from datetime import date
 from decimal import Decimal
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.contexts.attendance.repo import month_summary
 from app.contexts.identity.principal import (
     ROLE_HR_ADMIN,
     Principal,
@@ -243,6 +245,10 @@ async def create_run(
         )
     ).mappings().all()
 
+    # end-of-period date so attendance LOP reflects the whole month
+    period_end = date(payload.period_year, payload.period_month,
+                      calendar.monthrange(payload.period_year, payload.period_month)[1])
+
     total_gross = D(0)
     total_net = D(0)
     for st in structures:
@@ -252,7 +258,18 @@ async def create_run(
             s.gross, regime=st["tax_regime"],
             chapter_via_deductions=st["chapter_via_deductions"],
         )
-        slip = compute_payslip(s, working_days=payload.working_days, declared_tds=tds)
+        att = await month_summary(
+            session, st["employee_id"], payload.period_year, payload.period_month,
+            period_end,
+        )
+        # Payroll docks ONLY explicitly-marked absences. Unmarked days are
+        # treated as present (paid) — never withhold pay merely because
+        # attendance wasn't recorded. att.lop (which includes unmarked days)
+        # is for the attendance view's "needs attention", not for pay.
+        slip = compute_payslip(
+            s, working_days=payload.working_days,
+            lop_days=D(att.absent), declared_tds=tds,
+        )
         await session.execute(
             text("""insert into ihrms.payslip
                     (run_id, employee_id, lop_days, earnings, deductions,
