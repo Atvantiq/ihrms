@@ -43,6 +43,7 @@ import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 import { LeaveStatusBadge } from "@/components/LeaveStatusBadge";
 import { DevelopmentPlans } from "@/components/DevelopmentPlans";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -348,6 +349,8 @@ export default function SelfServicePage() {
           ))}
         </div>
       </section>
+
+      {emp && <OnboardingChecklist employeeId={emp.employee_id} />}
 
       <DevelopmentPlans title="My development plans" />
 

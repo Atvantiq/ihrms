@@ -54,6 +54,8 @@ const CONSENT_DOT: Record<ConsentLine["status"], string> = {
 import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 import { EmployeeRecords } from "@/components/EmployeeRecords";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { generateOnboarding } from "@/lib/api";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -105,6 +107,7 @@ export default function ProfilePage({
   const [statMsg, setStatMsg] = useState<string | null>(null);
   const [letterTypes, setLetterTypes] = useState<LetterType[]>([]);
   const [band, setBand] = useState<EmployeeBand | null>(null);
+  const [onboardNonce, setOnboardNonce] = useState(0);
 
   useEffect(() => {
     fetchEmployee(employeeId)
@@ -223,6 +226,24 @@ export default function ProfilePage({
       )}
 
       {emp.pii_visible && <EmployeeRecords employeeId={empIdNum} isHr={isHr} />}
+
+      {emp.pii_visible && (
+        <div className="space-y-2">
+          {isHr && (
+            <button
+              onClick={() =>
+                generateOnboarding(empIdNum)
+                  .then(() => setOnboardNonce((n) => n + 1))
+                  .catch((e) => setError(e.message))
+              }
+              className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-mute hover:text-ink"
+            >
+              ↻ Generate onboarding checklist
+            </button>
+          )}
+          <OnboardingChecklist key={onboardNonce} employeeId={empIdNum} canEdit={isHr} />
+        </div>
+      )}
 
       {emp.pii_visible && structure && (
         <Section title="Compensation">

@@ -949,6 +949,49 @@ export function fetchScorecard(cid: string): Promise<Scorecard> {
   return apiGet<Scorecard>(`/recruitment/candidates/${cid}/scorecard`);
 }
 
+// ---- onboarding checklists
+
+export interface OnboardingTask {
+  id: string;
+  title: string;
+  owner_role: string;
+  status: "pending" | "done";
+  completed_on: string | null;
+  sort_order: number;
+}
+export interface OnboardingChecklist {
+  employee_id: number;
+  tasks: OnboardingTask[];
+  done: number;
+  total: number;
+  pct: number;
+}
+export interface OnboardingSummary {
+  employee_id: number;
+  employee_name: string | null;
+  done: number;
+  total: number;
+  pct: number;
+}
+export function fetchOnboarding(employeeId: number): Promise<OnboardingChecklist> {
+  return apiGet<OnboardingChecklist>(`/onboarding/employees/${employeeId}/tasks`);
+}
+export function generateOnboarding(employeeId: number): Promise<OnboardingChecklist> {
+  return apiPost<OnboardingChecklist>(`/onboarding/employees/${employeeId}/generate`, {});
+}
+export function toggleOnboardingTask(
+  employeeId: number,
+  taskId: string,
+): Promise<OnboardingChecklist> {
+  return apiPost<OnboardingChecklist>(
+    `/onboarding/employees/${employeeId}/tasks/${taskId}/toggle`,
+    {},
+  );
+}
+export function fetchOnboardingInProgress(): Promise<OnboardingSummary[]> {
+  return apiGet<OnboardingSummary[]>("/onboarding/in-progress");
+}
+
 // ----------------------------------------------------------------- timesheet
 
 export interface Project {
