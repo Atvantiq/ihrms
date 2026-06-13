@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contexts.identity.principal import ROLE_HR_ADMIN, Principal, require_roles
+from app.contexts.reports.builder import DATASETS, build_query
 from app.contexts.reports.service import to_csv
 from app.core.db import get_session
 
@@ -168,6 +169,92 @@ async def insights(
         "avg_tenure_months": int(avg_tenure) if avg_tenure is not None else None,
         "open_requisitions": int(open_reqs),
     }
+
+
+# ------------------------------------------------------------ custom builder
+
+class BuilderColumn(BaseModel):
+    key: str
+    label: str
+
+
+class BuilderFilter(BaseModel):
+    key: str
+    label: str
+    ops: list[str]
+
+
+class DatasetMeta(BaseModel):
+    key: str
+    name: str
+    columns: list[BuilderColumn]
+    filters: list[BuilderFilter]
+
+
+class FilterClause(BaseModel):
+    field: str
+    op: str
+    value: str
+
+
+class BuildSpec(BaseModel):
+    dataset: str
+    columns: list[str] = []
+    filters: list[FilterClause] = []
+    limit: int = 200
+
+
+@router.get("/datasets", response_model=list[DatasetMeta])
+async def list_datasets(principal: Annotated[Principal, HR]) -> list[DatasetMeta]:
+    return [
+        DatasetMeta(
+            key=ds.key, name=ds.name,
+            columns=[BuilderColumn(key=k, label=c.label) for k, c in ds.columns.items()],
+            filters=[
+                BuilderFilter(key=k, label=f.label, ops=list(f.ops))
+                for k, f in ds.filters.items()
+            ],
+        )
+        for ds in DATASETS.values()
+    ]
+
+
+async def _run_build(
+    session: AsyncSession, spec: BuildSpec
+) -> tuple[list[str], list[dict[str, Any]]]:
+    try:
+        sql, params, cols = build_query(
+            spec.dataset, spec.columns,
+            [f.model_dump() for f in spec.filters], spec.limit,
+        )
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    result = await session.execute(text(sql), params)
+    return cols, [dict(r) for r in result.mappings().all()]
+
+
+@router.post("/build", response_model=ReportData)
+async def build_report(
+    spec: BuildSpec,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> ReportData:
+    cols, rows = await _run_build(session, spec)
+    name = DATASETS[spec.dataset].name if spec.dataset in DATASETS else spec.dataset
+    return ReportData(id=spec.dataset, name=name, columns=cols, rows=rows)
+
+
+@router.post("/build/csv")
+async def build_report_csv(
+    spec: BuildSpec,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    principal: Annotated[Principal, HR],
+) -> Response:
+    cols, rows = await _run_build(session, spec)
+    return Response(
+        content=to_csv(cols, rows), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{spec.dataset}_custom.csv"'},
+    )
 
 
 @router.get("/{report_id}", response_model=ReportData)

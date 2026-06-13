@@ -460,6 +460,36 @@ export function runReport(id: string): Promise<ReportData> {
   return apiGet<ReportData>(`/reports/${id}`);
 }
 
+// ---- custom report builder
+
+export interface BuilderColumn {
+  key: string;
+  label: string;
+}
+export interface BuilderFilter {
+  key: string;
+  label: string;
+  ops: string[];
+}
+export interface DatasetMeta {
+  key: string;
+  name: string;
+  columns: BuilderColumn[];
+  filters: BuilderFilter[];
+}
+export interface BuildSpec {
+  dataset: string;
+  columns: string[];
+  filters: { field: string; op: string; value: string }[];
+  limit?: number;
+}
+export function fetchDatasets(): Promise<DatasetMeta[]> {
+  return apiGet<DatasetMeta[]>("/reports/datasets");
+}
+export function buildReport(spec: BuildSpec): Promise<ReportData> {
+  return apiPost<ReportData>("/reports/build", spec);
+}
+
 // ----------------------------------------------------------------- exit / F&F
 
 export interface ClearanceItem {

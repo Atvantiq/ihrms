@@ -10,6 +10,7 @@ import {
   type ReportData,
   type ReportMeta,
 } from "@/lib/api";
+import { ReportBuilder } from "@/components/ReportBuilder";
 
 function KpiTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -26,6 +27,7 @@ export default function ReportsPage() {
   const [reports, setReports] = useState<ReportMeta[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
+  const [tab, setTab] = useState<"prebuilt" | "builder">("prebuilt");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,7 +59,23 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {insights && (
+      <div className="flex gap-1 border-b border-line">
+        {(["prebuilt", "builder"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-xs font-medium capitalize transition ${
+              tab === t ? "border-b-2 border-ink text-ink" : "text-mute hover:text-ink"
+            }`}
+          >
+            {t === "builder" ? "Custom builder" : "Prebuilt"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "builder" && <ReportBuilder />}
+
+      {tab === "prebuilt" && insights && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <KpiTile label="Headcount" value={String(insights.headcount)} hint="active" />
           <KpiTile label="Exits" value={String(insights.exits_total)} hint="completed F&F" />
@@ -74,6 +92,7 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {tab === "prebuilt" && (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="rounded-xl border border-line bg-surface shadow-sm">
           <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
@@ -142,6 +161,7 @@ export default function ReportsPage() {
           )}
         </section>
       </div>
+      )}
     </div>
   );
 }
