@@ -46,6 +46,7 @@ export const NAV: NavSection[] = [
     label: "Money",
     items: [
       { label: "Payroll", href: "/payroll", icon: "₹", hrOnly: true },
+      { label: "Tax declaration", href: "/tax", icon: "%" },
     ],
   },
   {

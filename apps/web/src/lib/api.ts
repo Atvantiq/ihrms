@@ -1085,6 +1085,63 @@ export function cancelAdvance(id: string): Promise<Advance> {
   return apiPost<Advance>(`/advances/${id}/cancel`, {});
 }
 
+// ----------------------------------------------------------------- tax
+
+export interface TaxSection {
+  key: string;
+  label: string;
+  cap: string;
+}
+export interface TaxDeclItem {
+  section: string;
+  amount: string;
+}
+export interface TaxDeclaration {
+  id: string | null;
+  employee_id: number;
+  fy: string;
+  regime: "old" | "new";
+  status: "draft" | "submitted" | "approved" | "rejected";
+  items: TaxDeclItem[];
+  declared_total: string;
+  eligible_deduction: string;
+  decided_at: string | null;
+}
+export interface PendingTaxDecl {
+  id: string;
+  employee_id: number;
+  employee_name: string | null;
+  fy: string;
+  regime: string;
+  eligible_deduction: string;
+}
+
+export function fetchTaxSections(): Promise<TaxSection[]> {
+  return apiGet<TaxSection[]>("/tax/sections");
+}
+export function fetchTaxDeclaration(fy?: string): Promise<TaxDeclaration> {
+  return apiGet<TaxDeclaration>(`/tax/declaration${fy ? `?fy=${fy}` : ""}`);
+}
+export function saveTaxDeclaration(body: {
+  fy?: string;
+  regime: "old" | "new";
+  items: { section: string; amount: string }[];
+}): Promise<TaxDeclaration> {
+  return apiPut<TaxDeclaration>("/tax/declaration", body);
+}
+export function submitTaxDeclaration(fy?: string): Promise<TaxDeclaration> {
+  return apiPost<TaxDeclaration>(`/tax/declaration/submit${fy ? `?fy=${fy}` : ""}`, {});
+}
+export function fetchPendingTaxDeclarations(): Promise<PendingTaxDecl[]> {
+  return apiGet<PendingTaxDecl[]>("/tax/declarations/pending");
+}
+export function decideTaxDeclaration(
+  id: string,
+  action: "approve" | "reject",
+): Promise<TaxDeclaration> {
+  return apiPost<TaxDeclaration>(`/tax/declaration/${id}/${action}`, {});
+}
+
 // ----------------------------------------------------------------- consent
 
 export interface ConsentLine {
