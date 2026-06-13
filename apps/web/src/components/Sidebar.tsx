@@ -9,9 +9,14 @@ export function Sidebar({ isHr }: { isHr: boolean }) {
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-surface">
-      <div className="flex items-center gap-2 px-4 py-3.5">
-        <div className="ai-gradient h-6 w-6 rounded-md" />
-        <span className="text-sm font-semibold text-ink">Atvantiq People</span>
+      <div className="flex items-center gap-2.5 px-4 py-3.5">
+        <div className="ai-gradient h-[26px] w-[26px] rounded-[7px]" />
+        <div className="leading-tight">
+          <div className="text-sm font-medium tracking-tight text-ink">
+            Atvantiq <span className="text-mute">/</span> People
+          </div>
+          <div className="text-[10px] tracking-wide text-mute">v1.0 · India</div>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 pb-4">
