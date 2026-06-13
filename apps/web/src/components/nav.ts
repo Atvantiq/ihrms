@@ -34,6 +34,7 @@ export const NAV: NavSection[] = [
       { label: "Performance", href: "/performance", icon: "★" },
       { label: "Feedback", href: "/feedback", icon: "♡" },
       { label: "Improvement plans", href: "/pip", icon: "◑" },
+      { label: "Career ladders", href: "/career", icon: "◭", hrOnly: true },
       { label: "Org masters", href: "/settings/org", icon: "◈", hrOnly: true },
       { label: "Bands", href: "/bands", icon: "▥", hrOnly: true },
     ],

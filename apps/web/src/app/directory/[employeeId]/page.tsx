@@ -55,6 +55,7 @@ import { Avatar } from "@/components/Avatar";
 import { StatusPill } from "@/components/StatusPill";
 import { EmployeeRecords } from "@/components/EmployeeRecords";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { CareerLadderView } from "@/components/CareerLadderView";
 import { generateOnboarding } from "@/lib/api";
 
 const MONTHS = [
@@ -242,6 +243,7 @@ export default function ProfilePage({
             </button>
           )}
           <OnboardingChecklist key={onboardNonce} employeeId={empIdNum} canEdit={isHr} />
+          <CareerLadderView employeeId={empIdNum} canPlace={isHr} />
         </div>
       )}
 

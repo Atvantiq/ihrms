@@ -992,6 +992,83 @@ export function fetchOnboardingInProgress(): Promise<OnboardingSummary[]> {
   return apiGet<OnboardingSummary[]>("/onboarding/in-progress");
 }
 
+// ---- career ladders + competencies
+
+export interface CareerLevel {
+  id: string;
+  name: string;
+  rank: number;
+  summary: string | null;
+}
+export interface CareerTrack {
+  id: string;
+  name: string;
+  description: string | null;
+  levels: CareerLevel[];
+}
+export interface Competency {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+}
+export interface LevelExpectation {
+  competency_id: string;
+  competency_name: string;
+  expectation: string;
+}
+export interface CareerLadder {
+  employee_id: number;
+  track_name: string | null;
+  level: CareerLevel | null;
+  expectations: LevelExpectation[];
+  next_level: CareerLevel | null;
+}
+export function fetchCareerTracks(): Promise<CareerTrack[]> {
+  return apiGet<CareerTrack[]>("/career/tracks");
+}
+export function createCareerTrack(name: string, description?: string): Promise<CareerTrack> {
+  return apiPost<CareerTrack>("/career/tracks", { name, description: description ?? null });
+}
+export function addCareerLevel(trackId: string, body: {
+  name: string;
+  rank: number;
+  summary?: string | null;
+}): Promise<CareerLevel> {
+  return apiPost<CareerLevel>(`/career/tracks/${trackId}/levels`, body);
+}
+export function fetchCompetencies(): Promise<Competency[]> {
+  return apiGet<Competency[]>("/career/competencies");
+}
+export function createCompetency(body: {
+  name: string;
+  category?: string | null;
+  description?: string | null;
+}): Promise<Competency> {
+  return apiPost<Competency>("/career/competencies", body);
+}
+export function fetchLevelExpectations(levelId: string): Promise<LevelExpectation[]> {
+  return apiGet<LevelExpectation[]>(`/career/levels/${levelId}/expectations`);
+}
+export function setLevelExpectation(
+  levelId: string,
+  competencyId: string,
+  expectation: string,
+): Promise<LevelExpectation[]> {
+  return apiPost<LevelExpectation[]>(`/career/levels/${levelId}/expectations`, {
+    competency_id: competencyId,
+    expectation,
+  });
+}
+export function placeEmployee(employeeId: number, levelId: string): Promise<CareerLadder> {
+  return apiPut<CareerLadder>(`/career/employees/${employeeId}/placement`, {
+    level_id: levelId,
+  });
+}
+export function fetchCareerLadder(employeeId: number): Promise<CareerLadder> {
+  return apiGet<CareerLadder>(`/career/employees/${employeeId}/ladder`);
+}
+
 // ----------------------------------------------------------------- timesheet
 
 export interface Project {

@@ -44,6 +44,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { LeaveStatusBadge } from "@/components/LeaveStatusBadge";
 import { DevelopmentPlans } from "@/components/DevelopmentPlans";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { CareerLadderView } from "@/components/CareerLadderView";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -351,6 +352,8 @@ export default function SelfServicePage() {
       </section>
 
       {emp && <OnboardingChecklist employeeId={emp.employee_id} />}
+
+      {emp && <CareerLadderView employeeId={emp.employee_id} title="My career ladder" />}
 
       <DevelopmentPlans title="My development plans" />
 
