@@ -909,6 +909,21 @@ export function fetchDashboard(): Promise<DashboardSummary> {
   return apiGet<DashboardSummary>("/dashboard");
 }
 
+export interface PulseDecision {
+  kind: string;
+  severity: "high" | "medium" | "low";
+  icon: string;
+  title: string;
+  detail: string;
+  action_label: string;
+  action_href: string;
+  count: number;
+}
+
+export function fetchPulseInbox(): Promise<PulseDecision[]> {
+  return apiGet<PulseDecision[]>("/pulse/inbox");
+}
+
 // ----------------------------------------------------------------- leave
 
 export interface LeaveType {

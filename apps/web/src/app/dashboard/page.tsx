@@ -5,8 +5,10 @@ import Link from "next/link";
 import {
   fetchAnnouncements,
   fetchDashboard,
+  fetchPulseInbox,
   type Announcement,
   type DashboardSummary,
+  type PulseDecision,
 } from "@/lib/api";
 import { Avatar } from "@/components/Avatar";
 
@@ -15,6 +17,60 @@ const BANNER_STYLE: Record<Announcement["level"], string> = {
   success: "border-green-soft bg-green-soft/40 text-green-strong",
   warning: "border-warn-soft bg-warn-soft/40 text-warn-strong",
 };
+
+const PULSE_ACTION_COLOR: Record<PulseDecision["severity"], string> = {
+  high: "text-red-strong",
+  medium: "text-warn-strong",
+  low: "text-indigo-strong",
+};
+
+const PULSE_DOT_COLOR: Record<PulseDecision["severity"], string> = {
+  high: "bg-red",
+  medium: "bg-warn",
+  low: "bg-indigo",
+};
+
+function PulseInbox({ decisions }: { decisions: PulseDecision[] }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-line shadow-sm">
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ background: "var(--ai-bg)" }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid h-5 w-5 place-items-center rounded-md text-xs text-white" style={{ background: "var(--ai-gradient)" }}>
+            ✦
+          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-strong">
+            Atvantiq AI · Inbox
+          </span>
+        </div>
+        <span className="text-xs font-medium text-mute">
+          {decisions.length} decision{decisions.length === 1 ? "" : "s"} ready · sorted by urgency
+        </span>
+      </div>
+      <div className="divide-y divide-line-2 bg-surface">
+        {decisions.map((d) => (
+          <Link
+            key={d.kind}
+            href={d.action_href}
+            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-line-2/50"
+          >
+            <span className={`h-2 w-2 shrink-0 rounded-full ${PULSE_DOT_COLOR[d.severity]}`} />
+            <span className="w-5 shrink-0 text-center text-sm text-mute">{d.icon}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-ink">{d.title}</span>
+              <span className="block truncate text-xs text-mute">{d.detail}</span>
+            </span>
+            <span className={`shrink-0 text-xs font-semibold ${PULSE_ACTION_COLOR[d.severity]}`}>
+              {d.action_label} →
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function AnnouncementBanner({ a }: { a: Announcement }) {
   return (
@@ -70,6 +126,7 @@ function Panel({
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [pulse, setPulse] = useState<PulseDecision[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +135,9 @@ export default function DashboardPage() {
       .catch((e: Error) => setError(e.message));
     fetchAnnouncements()
       .then(setAnnouncements)
+      .catch(() => {});
+    fetchPulseInbox()
+      .then(setPulse)
       .catch(() => {});
   }, []);
 
@@ -101,6 +161,8 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
+
+      {pulse.length > 0 && <PulseInbox decisions={pulse} />}
 
       {data && (
         <>
