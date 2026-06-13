@@ -20,6 +20,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "▦" },
       { label: "Tasks", href: "/tasks", icon: "⊟" },
+      { label: "Self-service", href: "/self-service", icon: "◇" },
       { label: "Reports", href: "/reports", icon: "▤", hrOnly: true },
     ],
   },
