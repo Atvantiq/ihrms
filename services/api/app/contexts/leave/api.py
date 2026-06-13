@@ -27,6 +27,7 @@ from app.contexts.leave.service import (
     ensure_balance,
     working_days,
 )
+from app.core.audit import record_audit
 from app.core.db import get_session
 
 router = APIRouter(prefix="/leave", tags=["leave"])
@@ -340,6 +341,10 @@ async def approve(
                 decision_note=:note, decided_at=now(), updated_at=now() where id=:id"""),
         {"by": principal.employee_id, "note": payload.note, "id": req_id},
     )
+    await record_audit(
+        session, principal, "leave.approve", "leave_request", req_id,
+        summary=f"Approved {req['days']} day(s)",
+    )
     await session.commit()
     return await _get_request(session, req_id, principal)
 
@@ -375,6 +380,10 @@ async def reject(
                 decision_note=:note, decided_at=now(), updated_at=now() where id=:id"""),
         {"by": principal.employee_id, "note": payload.note, "id": req_id},
     )
+    await record_audit(
+        session, principal, "leave.reject", "leave_request", req_id,
+        summary="Rejected leave request",
+    )
     await session.commit()
     return await _get_request(session, req_id, principal)
 
@@ -407,6 +416,10 @@ async def cancel(
         text("""update ihrms.leave_request set status='cancelled', updated_at=now()
                 where id=:id"""),
         {"id": req_id},
+    )
+    await record_audit(
+        session, principal, "leave.cancel", "leave_request", req_id,
+        summary="Cancelled leave request",
     )
     await session.commit()
     return await _get_request(session, req_id, principal)

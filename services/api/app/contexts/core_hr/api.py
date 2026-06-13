@@ -24,6 +24,7 @@ from app.contexts.identity.principal import (
     get_current_principal,
     require_roles,
 )
+from app.core.audit import record_audit
 from app.core.db import get_session
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -107,6 +108,13 @@ async def add_employee(
         employee_id = await create_employee(session, payload)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
+    await record_audit(
+        session, principal, "employee.create", "employee", str(employee_id),
+        summary=f"Added {payload.first_name} {payload.last_name or ''}".strip()
+        + f" ({payload.employee_code})",
+        changes={"employee_code": payload.employee_code, "designation": payload.designation},
+    )
+    await session.commit()
     return await get_employee(employee_id, session, principal)
 
 
@@ -123,6 +131,14 @@ async def edit_employee(
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
+    # audit records WHICH fields changed, not their (often PII) values
+    changed = sorted(payload.model_dump(exclude_unset=True).keys())
+    await record_audit(
+        session, principal, "employee.update", "employee", str(employee_id),
+        summary=f"Updated {len(changed)} field(s)",
+        changes={"fields": changed},
+    )
+    await session.commit()
     return await get_employee(employee_id, session, principal)
 
 

@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.contexts.identity.principal import ROLE_HR_ADMIN, Principal, require_roles
+from app.core.audit import record_audit
 from app.core.db import get_session
 
 router = APIRouter(prefix="/org", tags=["org"])
@@ -99,6 +100,10 @@ async def create_master(
             {"kind": payload.kind, "name": payload.name.strip()},
         )
     ).mappings().one()
+    await record_audit(
+        session, principal, "org_master.create", "org_master", row["id"],
+        summary=f"Created {payload.kind} '{payload.name.strip()}'",
+    )
     await session.commit()
     return MasterOut(**dict(row), raw_values=[], employee_count=0)
 
@@ -119,6 +124,10 @@ async def rename_master(
     ).mappings().first()
     if row is None:
         raise HTTPException(404, "Master not found")
+    await record_audit(
+        session, principal, "org_master.rename", "org_master", master_id,
+        summary=f"Renamed to '{payload.name.strip()}'",
+    )
     await session.commit()
     masters = await list_masters(session, principal, kind=row["kind"])
     return next(m for m in masters if m.id == master_id)
@@ -157,6 +166,11 @@ async def merge_master(
         text("""update ihrms.org_masters set is_active = false, updated_at = now()
                 where id = :src"""),
         {"src": master_id},
+    )
+    await record_audit(
+        session, principal, "org_master.merge", "org_master", master_id,
+        summary=f"Merged into {payload.into_master_id}",
+        changes={"into_master_id": payload.into_master_id},
     )
     await session.commit()
     masters = await list_masters(session, principal, kind=pair["dst_kind"])
